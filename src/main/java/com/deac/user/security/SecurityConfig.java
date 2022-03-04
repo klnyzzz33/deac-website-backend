@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -23,11 +24,6 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         http.authorizeRequests()
                 .antMatchers("/api/**").permitAll()
                 .anyRequest().authenticated();
-        http.formLogin()
-                .loginPage("/login")
-                .defaultSuccessUrl("/home", true);
-        http.logout().logoutSuccessUrl("/login");
-        http.exceptionHandling().accessDeniedPage("/login");
     }
 
     @Bean

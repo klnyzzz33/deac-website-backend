@@ -6,9 +6,8 @@ import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -33,6 +32,7 @@ public class UserController {
     }
 
     @PostMapping("/api/register")
+    @CrossOrigin(origins = "http://localhost:4200")
     public String register(@Valid @RequestBody RegisterDto registerDto) {
         return userService.signUp(modelMapper.map(registerDto, User.class));
     }
