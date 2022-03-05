@@ -3,7 +3,7 @@ package com.deac.user.service.impl;
 import com.deac.user.exception.MyException;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.persistence.repository.UserRepository;
-import com.deac.user.security.UserDetails;
+import com.deac.user.security.TokenProvider;
 import com.deac.user.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -13,11 +13,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import javax.servlet.http.HttpServletRequest;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -28,13 +25,17 @@ public class UserServiceImpl implements UserService {
 
     private final AuthenticationManager authenticationManager;
 
+    private final TokenProvider tokenProvider;
+
     @Autowired
     public UserServiceImpl(UserRepository userRepository,
                            PasswordEncoder passwordEncoder,
-                           AuthenticationManager authenticationManager) {
+                           AuthenticationManager authenticationManager,
+                           TokenProvider tokenProvider) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
+        this.tokenProvider = tokenProvider;
     }
 
     @Override
@@ -42,8 +43,7 @@ public class UserServiceImpl implements UserService {
         try {
             Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            return "Successfully logged in with user " + authentication.getName();
-            //return jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
+            return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
         } catch (AuthenticationException e) {
             throw new MyException("Could not log in", HttpStatus.UNAUTHORIZED);
         }
@@ -71,12 +71,12 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public boolean validateToken(String token) {
-        return false;
+        return tokenProvider.validateToken(token);
     }
 
     @Override
     public String refresh(String username) {
-        return null;
+        return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
     }
 
     @Override

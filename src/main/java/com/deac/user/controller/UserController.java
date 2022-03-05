@@ -1,17 +1,22 @@
 package com.deac.user.controller;
 
+import com.deac.user.exception.MyException;
 import com.deac.user.model.LoginDto;
 import com.deac.user.model.RegisterDto;
+import com.deac.user.model.ResponseMessage;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
+import java.util.Arrays;
+import java.util.Optional;
 
 @RestController
 public class UserController {
@@ -27,24 +32,54 @@ public class UserController {
     }
 
     @PostMapping("/api/login")
-    public String login(@Valid @RequestBody LoginDto loginDto) {
-        return userService.signIn(loginDto.getUsername(), loginDto.getPassword());
+    public ResponseMessage login(@Valid @RequestBody LoginDto loginDto, HttpServletResponse response) {
+        String token = userService.signIn(loginDto.getUsername(), loginDto.getPassword());
+        Cookie cookie = new Cookie("jwt", token);
+        setCookie(cookie, 300);
+        response.addCookie(cookie);
+        return new ResponseMessage(userService.signIn(loginDto.getUsername(), loginDto.getPassword()));
     }
 
     @PostMapping("/api/register")
-    @CrossOrigin(origins = "http://localhost:4200")
-    public String register(@Valid @RequestBody RegisterDto registerDto) {
-        return userService.signUp(modelMapper.map(registerDto, User.class));
+    public ResponseMessage register(@Valid @RequestBody RegisterDto registerDto) {
+        return new ResponseMessage(userService.signUp(modelMapper.map(registerDto, User.class)));
     }
 
     @PostMapping("/api/current_user")
-    public String whoAmI() {
-        return userService.whoAmI();
+    public ResponseMessage whoAmI(HttpServletRequest request) {
+        Optional<String> jwt = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("jwt")).map(Cookie::getValue).findFirst();
+        if (jwt.isEmpty()) {
+            throw new MyException("Expired cookie", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return new ResponseMessage(userService.whoAmI());
     }
 
     @PostMapping("/api/logout")
-    public String logout() {
-        return userService.signOut();
+    public ResponseMessage logout(HttpServletResponse response) {
+        Cookie cookie = new Cookie("jwt", null);
+        setCookie(cookie, 0);
+        response.addCookie(cookie);
+        return new ResponseMessage(userService.signOut());
+    }
+
+    private void setCookie(Cookie cookie, int age) {
+        cookie.setMaxAge(age);
+        cookie.setSecure(false);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+    }
+
+    @GetMapping("/api/dashboard")
+    public String getDashboard() {
+        return null;
+    }
+
+    private boolean isValidToken(HttpServletRequest request) {
+        Optional<String> jwt = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("jwt")).map(Cookie::getValue).findFirst();
+        if (jwt.isEmpty()) {
+            throw new MyException("Expired cookie", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return userService.validateToken(jwt.get());
     }
 
 }
