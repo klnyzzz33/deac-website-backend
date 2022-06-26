@@ -37,7 +37,7 @@ public class UserController {
         Cookie cookie = new Cookie("jwt", token);
         setCookie(cookie, 300);
         response.addCookie(cookie);
-        return new ResponseMessage(userService.signIn(loginDto.getUsername(), loginDto.getPassword()));
+        return new ResponseMessage(token);
     }
 
     @PostMapping("/api/register")
@@ -45,16 +45,28 @@ public class UserController {
         return new ResponseMessage(userService.signUp(modelMapper.map(registerDto, User.class)));
     }
 
-    @PostMapping("/api/current_user")
+    @GetMapping("/api/current_user")
     public ResponseMessage whoAmI(HttpServletRequest request) {
+        if (request.getCookies() == null) {
+            throw new MyException("Expired cookie", HttpStatus.UNAUTHORIZED);
+        }
         Optional<String> jwt = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("jwt")).map(Cookie::getValue).findFirst();
         if (jwt.isEmpty()) {
-            throw new MyException("Expired cookie", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Expired cookie", HttpStatus.UNAUTHORIZED);
         }
-        return new ResponseMessage(userService.whoAmI());
+        return new ResponseMessage(userService.whoAmI(jwt.get()));
     }
 
-    @PostMapping("/api/logout")
+    @GetMapping("/api/refresh")
+    public ResponseMessage refresh(HttpServletResponse response) {
+        String token = userService.refresh();
+        Cookie cookie = new Cookie("jwt", token);
+        setCookie(cookie, 300);
+        response.addCookie(cookie);
+        return new ResponseMessage(token);
+    }
+
+    @GetMapping("/api/logout")
     public ResponseMessage logout(HttpServletResponse response) {
         Cookie cookie = new Cookie("jwt", null);
         setCookie(cookie, 0);

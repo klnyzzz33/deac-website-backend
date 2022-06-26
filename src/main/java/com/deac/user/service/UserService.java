@@ -10,11 +10,11 @@ public interface UserService {
 
     String signUp(User user);
 
-    String whoAmI();
+    String whoAmI(String token);
 
     boolean validateToken(String token);
 
-    String refresh(String username);
+    String refresh();
 
     String signOut();
 

@@ -45,23 +45,30 @@ public class UserServiceImpl implements UserService {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
         } catch (AuthenticationException e) {
-            throw new MyException("Could not log in", HttpStatus.UNAUTHORIZED);
+            throw new MyException("Could not log in, invalid credentials", HttpStatus.UNAUTHORIZED);
         }
     }
 
     @Override
     public String signUp(User user) {
-        if (!userRepository.existsByUsername(user.getUsername()) && !userRepository.existsByEmail(user.getEmail())) {
+        if (userRepository.existsByUsername(user.getUsername()) || userRepository.existsByEmail(user.getEmail())) {
+            throw new MyException("Could not register, username or email already exists", HttpStatus.CONFLICT);
+        }
+
+        try {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             userRepository.save(user);
             return "Successfully registered with user " + user.getUsername();
-        } else {
-            throw new MyException("Could not register", HttpStatus.CONFLICT);
+        } catch (Exception e) {
+            throw new MyException("Could not register, invalid data specified", HttpStatus.BAD_REQUEST);
         }
     }
 
     @Override
-    public String whoAmI() {
+    public String whoAmI(String token) {
+        if (!validateToken(token)) {
+            throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
+        }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof AnonymousAuthenticationToken)) {
             return authentication.getName();
@@ -70,12 +77,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public boolean validateToken(String token) {
-        return tokenProvider.validateToken(token);
-    }
-
-    @Override
-    public String refresh(String username) {
+    public String refresh() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
         return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
     }
 
@@ -83,6 +87,11 @@ public class UserServiceImpl implements UserService {
     public String signOut() {
         SecurityContextHolder.clearContext();
         return "Successfully logged out";
+    }
+
+    @Override
+    public boolean validateToken(String token) {
+        return tokenProvider.validateToken(token);
     }
 
 }
