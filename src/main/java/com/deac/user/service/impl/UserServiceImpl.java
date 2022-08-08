@@ -1,5 +1,6 @@
 package com.deac.user.service.impl;
 
+import com.deac.mail.EmailService;
 import com.deac.user.exception.MyException;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.persistence.repository.UserRepository;
@@ -27,15 +28,19 @@ public class UserServiceImpl implements UserService {
 
     private final TokenProvider tokenProvider;
 
+    private final EmailService emailService;
+
     @Autowired
     public UserServiceImpl(UserRepository userRepository,
                            PasswordEncoder passwordEncoder,
                            AuthenticationManager authenticationManager,
-                           TokenProvider tokenProvider) {
+                           TokenProvider tokenProvider,
+                           EmailService emailService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.tokenProvider = tokenProvider;
+        this.emailService = emailService;
     }
 
     @Override
@@ -43,6 +48,7 @@ public class UserServiceImpl implements UserService {
         try {
             Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            emailService.sendMessage("kalny.zalan7@gmail.com", "test", "test");
             return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
         } catch (AuthenticationException e) {
             throw new MyException("Could not log in, invalid credentials", HttpStatus.UNAUTHORIZED);
