@@ -3,6 +3,7 @@ package com.deac.user.controller;
 import com.deac.user.exception.MyException;
 import com.deac.user.model.LoginDto;
 import com.deac.user.model.RegisterDto;
+import com.deac.user.model.ResetDto;
 import com.deac.user.model.ResponseMessage;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import javax.mail.MessagingException;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -86,12 +88,22 @@ public class UserController {
         return null;
     }
 
-    private boolean isValidToken(HttpServletRequest request) {
+    /*private boolean isValidToken(HttpServletRequest request) {
         Optional<String> jwt = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("jwt")).map(Cookie::getValue).findFirst();
         if (jwt.isEmpty()) {
             throw new MyException("Expired cookie", HttpStatus.INTERNAL_SERVER_ERROR);
         }
         return userService.validateToken(jwt.get());
+    }*/
+
+    @PostMapping("/api/forgot")
+    public ResponseMessage sendPasswordRecoveryLink(@RequestBody String email) throws MessagingException {
+        return new ResponseMessage(userService.recoverPassword(email));
+    }
+
+    @PostMapping("/api/reset")
+    public ResponseMessage changePassword(@RequestBody ResetDto resetDto) {
+        return new ResponseMessage(userService.resetPassword(resetDto.getToken(), resetDto.getPassword()));
     }
 
 }
