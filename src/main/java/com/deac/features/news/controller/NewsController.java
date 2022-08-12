@@ -1,5 +1,6 @@
 package com.deac.features.news.controller;
 
+import com.deac.features.news.model.ModifyDto;
 import com.deac.features.news.model.NewsDto;
 import com.deac.features.news.service.NewsService;
 import com.deac.user.model.ResponseMessage;
@@ -29,6 +30,11 @@ public class NewsController {
     @PostMapping("/api/news/delete")
     public ResponseMessage deleteNews(@RequestBody Integer newsId) {
         return new ResponseMessage(newsService.deleteNews(newsId));
+    }
+
+    @PostMapping("/api/news/update")
+    public ResponseMessage updateNews(@RequestBody ModifyDto modifyDto) {
+        return new ResponseMessage(newsService.updateNews(modifyDto));
     }
 
 }

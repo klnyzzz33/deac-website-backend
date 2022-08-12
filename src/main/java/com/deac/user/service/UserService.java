@@ -20,6 +20,8 @@ public interface UserService {
 
     String getCurrentUsername();
 
+    Integer getCurrentUserId(String username);
+
     String recoverPassword(String email) throws MessagingException;
 
     String resetPassword(String token, String password);

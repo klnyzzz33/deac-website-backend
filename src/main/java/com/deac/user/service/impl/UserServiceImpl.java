@@ -135,6 +135,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public Integer getCurrentUserId(String username) {
+        return userRepository.findByUsername(username).getId();
+    }
+
+    @Override
     public String recoverPassword(String email) {
         try {
             if (!userRepository.existsByEmail(email)) {

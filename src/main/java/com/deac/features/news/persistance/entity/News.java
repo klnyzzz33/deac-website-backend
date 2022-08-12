@@ -4,12 +4,13 @@ import lombok.*;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.persistence.*;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 @Entity
 @Getter
 @Setter
-@ToString
 @NoArgsConstructor
 public class News {
 
@@ -25,17 +26,21 @@ public class News {
     private String content;
 
     @Column(nullable = false)
-    private String authorName;
+    private Integer authorId;
 
     @DateTimeFormat(pattern = "yyyy.MM.dd")
     @Column(nullable = false)
     private Date createDate;
 
-    public News(String title, String content, String authorName, Date createDate) {
+    @OneToMany(cascade = CascadeType.ALL)
+    private List<ModifyEntry> modifyEntries;
+
+    public News(String title, String content, Integer authorId, Date createDate) {
         this.title = title;
         this.content = content;
-        this.authorName = authorName;
+        this.authorId = authorId;
         this.createDate = createDate;
+        this.modifyEntries = new ArrayList<>();
     }
 
 }
