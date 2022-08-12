@@ -25,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.mail.MessagingException;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -55,6 +56,9 @@ public class UserServiceImpl implements UserService {
         this.authenticationManager = authenticationManager;
         this.tokenProvider = tokenProvider;
         this.emailService = emailService;
+        if (!this.userRepository.existsByRoles(List.of(User.Role.ROLE_ADMIN))) {
+            this.userRepository.save(new User("kyukoshindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(User.Role.ROLE_ADMIN)));
+        }
     }
 
     @Override
