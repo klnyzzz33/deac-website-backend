@@ -16,6 +16,10 @@ public interface UserService {
 
     String signOut();
 
+    boolean hasAdminPrivileges();
+
+    String getCurrentUsername();
+
     String recoverPassword(String email) throws MessagingException;
 
     String resetPassword(String token, String password);

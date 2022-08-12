@@ -57,7 +57,7 @@ public class UserServiceImpl implements UserService {
         this.tokenProvider = tokenProvider;
         this.emailService = emailService;
         if (!this.userRepository.existsByRoles(List.of(User.Role.ROLE_ADMIN))) {
-            this.userRepository.save(new User("kyukoshindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(User.Role.ROLE_ADMIN)));
+            this.userRepository.save(new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(User.Role.ROLE_ADMIN)));
         }
     }
 
@@ -68,6 +68,7 @@ public class UserServiceImpl implements UserService {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
         } catch (AuthenticationException e) {
+            System.out.println("asd");
             throw new MyException("Could not log in, invalid credentials", HttpStatus.UNAUTHORIZED);
         } catch (DataAccessException e) {
             throw new MyException("Could not log in, internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -99,11 +100,7 @@ public class UserServiceImpl implements UserService {
         if (!validateToken(token)) {
             throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
         }
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!(authentication instanceof AnonymousAuthenticationToken)) {
-            return authentication.getName();
-        }
-        throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
+        return getCurrentUsername();
     }
 
     private boolean validateToken(String token) {
@@ -112,8 +109,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public String refresh() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
+        String username = getCurrentUsername();
         return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
     }
 
@@ -121,6 +117,21 @@ public class UserServiceImpl implements UserService {
     public String signOut() {
         SecurityContextHolder.clearContext();
         return "Successfully logged out";
+    }
+
+    @Override
+    public boolean hasAdminPrivileges() {
+        String username = getCurrentUsername();
+        return userRepository.findByUsername(username).getRoles().contains(User.Role.ROLE_ADMIN);
+    }
+
+    @Override
+    public String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!(authentication instanceof AnonymousAuthenticationToken)) {
+            return authentication.getName();
+        }
+        throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
     }
 
     @Override
@@ -145,6 +156,7 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    @Override
     public String resetPassword(String token, String password) {
         try {
             String tokenHash = DigestUtils.sha256Hex(token);
