@@ -23,6 +23,9 @@ public class News {
     private String title;
 
     @Column(nullable = false)
+    private String description;
+
+    @Column(nullable = false)
     private String content;
 
     @Column(nullable = false)
@@ -35,8 +38,9 @@ public class News {
     @OneToMany(cascade = CascadeType.ALL)
     private List<ModifyEntry> modifyEntries;
 
-    public News(String title, String content, Integer authorId, Date createDate) {
+    public News(String title, String description, String content, Integer authorId, Date createDate) {
         this.title = title;
+        this.description = description;
         this.content = content;
         this.authorId = authorId;
         this.createDate = createDate;

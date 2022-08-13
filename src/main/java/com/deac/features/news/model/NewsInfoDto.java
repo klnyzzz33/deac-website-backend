@@ -16,6 +16,8 @@ public class NewsInfoDto {
 
     private String title;
 
+    private String description;
+
     private String content;
 
     private String author;
