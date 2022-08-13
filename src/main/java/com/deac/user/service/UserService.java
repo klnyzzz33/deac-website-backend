@@ -22,6 +22,8 @@ public interface UserService {
 
     Integer getCurrentUserId(String username);
 
+    String getUser(Integer userId);
+
     String recoverPassword(String email) throws MessagingException;
 
     String resetPassword(String token, String password);

@@ -140,6 +140,15 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public String getUser(Integer userId) {
+        Optional<User> user = userRepository.findById(userId);
+        if (user.isEmpty()) {
+            throw new MyException("Given user does not exist", HttpStatus.BAD_REQUEST);
+        }
+        return user.get().getUsername();
+    }
+
+    @Override
     public String recoverPassword(String email) {
         try {
             if (!userRepository.existsByEmail(email)) {
