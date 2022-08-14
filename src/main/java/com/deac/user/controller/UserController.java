@@ -37,7 +37,7 @@ public class UserController {
     public ResponseMessage login(@Valid @RequestBody LoginDto loginDto, HttpServletResponse response) {
         String token = userService.signIn(loginDto.getUsername(), loginDto.getPassword());
         Cookie cookie = new Cookie("jwt", token);
-        setCookie(cookie, 300);
+        setCookie(cookie, 600);
         response.addCookie(cookie);
         return new ResponseMessage(token);
     }
@@ -63,7 +63,7 @@ public class UserController {
     public ResponseMessage refresh(HttpServletResponse response) {
         String token = userService.refresh();
         Cookie cookie = new Cookie("jwt", token);
-        setCookie(cookie, 300);
+        setCookie(cookie, 600);
         response.addCookie(cookie);
         return new ResponseMessage(token);
     }
