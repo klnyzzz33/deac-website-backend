@@ -8,10 +8,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -24,11 +21,8 @@ public class TokenProvider {
 
     private final long validityInMilliseconds = 300000;
 
-    private final UserDetailsService userDetailsService;
-
     @Autowired
-    public TokenProvider(UserDetailsService userDetailsService) {
-        this.userDetailsService = userDetailsService;
+    public TokenProvider() {
         secretKey = Base64.getEncoder().encodeToString(secretKey.getBytes());
     }
 

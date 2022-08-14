@@ -63,4 +63,5 @@ public class TokenFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         return Arrays.stream(excludedEndPoints).anyMatch(e -> new AntPathMatcher().match(e, request.getRequestURI()));
     }
+
 }
