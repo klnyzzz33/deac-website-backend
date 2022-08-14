@@ -96,18 +96,6 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public String whoAmI(String token) {
-        if (!validateToken(token)) {
-            throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
-        }
-        return getCurrentUsername();
-    }
-
-    private boolean validateToken(String token) {
-        return tokenProvider.validateToken(token);
-    }
-
-    @Override
     public String refresh() {
         String username = getCurrentUsername();
         return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());

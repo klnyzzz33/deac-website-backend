@@ -10,8 +10,6 @@ public interface UserService {
 
     String signUp(User user);
 
-    String whoAmI(String token);
-
     String refresh();
 
     String signOut();
