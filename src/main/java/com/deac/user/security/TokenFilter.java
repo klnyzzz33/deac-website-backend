@@ -1,6 +1,9 @@
 package com.deac.user.security;
 
 import com.deac.user.exception.MyException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,39 +24,51 @@ import java.util.Optional;
 @Component
 public class TokenFilter extends OncePerRequestFilter {
 
-    private static final String[] excludedEndPoints = new String[] {"/api/user/login", "/api/user/register", "/api/user/forgot", "/api/user/reset"};
+    private static final String[] excludedEndPoints = new String[]{"/api/user/login", "/api/user/register", "/api/user/forgot", "/api/user/reset"};
 
     private final TokenProvider tokenProvider;
 
-    public TokenFilter(TokenProvider tokenProvider) {
+    private final ObjectMapper objectMapper;
+
+    public TokenFilter(TokenProvider tokenProvider, ObjectMapper objectMapper) {
         this.tokenProvider = tokenProvider;
+        this.objectMapper = objectMapper;
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, FilterChain filterChain) throws ServletException, IOException {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
-            throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
-        }
-        if (!httpServletRequest.getRequestURI().equals("/api/user/refresh") && !httpServletRequest.getRequestURI().equals("/api/user/logout")) {
-            try {
-                if (httpServletRequest.getCookies() == null) {
-                    throw new MyException("Expired cookie", HttpStatus.UNAUTHORIZED);
-                }
-                Optional<String> jwt = Arrays.stream(httpServletRequest.getCookies()).filter(cookie -> cookie.getName().equals("jwt")).map(Cookie::getValue).findFirst();
-                if (jwt.isEmpty()) {
-                    throw new MyException("Expired cookie", HttpStatus.UNAUTHORIZED);
-                }
-                if (!tokenProvider.validateToken(jwt.get())) {
-                    throw new MyException("Invalid token", HttpStatus.UNAUTHORIZED);
+    protected void doFilterInternal(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, FilterChain filterChain) throws IOException, ServletException {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
+                throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
+            }
+            if (httpServletRequest.getCookies() == null) {
+                SecurityContextHolder.clearContext();
+                throw new MyException("Expired cookie", HttpStatus.UNAUTHORIZED);
+            }
+            Optional<String> jwt = Arrays.stream(httpServletRequest.getCookies()).filter(cookie -> cookie.getName().equals("jwt")).map(Cookie::getValue).findFirst();
+            if (jwt.isEmpty()) {
+                SecurityContextHolder.clearContext();
+                throw new MyException("Expired cookie", HttpStatus.UNAUTHORIZED);
+            }
+            if (!httpServletRequest.getRequestURI().equals("/api/user/refresh") && !httpServletRequest.getRequestURI().equals("/api/user/logout")) {
+                try {
+                    tokenProvider.validateToken(jwt.get());
+                } catch (ExpiredJwtException e) {
+                    throw e;
+                } catch (JwtException | IllegalArgumentException e) {
+                    SecurityContextHolder.clearContext();
+                    throw e;
                 }
                 if (!tokenProvider.getUsernameFromToken(jwt.get()).equals(authentication.getName())) {
+                    SecurityContextHolder.clearContext();
                     throw new MyException("Invalid token", HttpStatus.UNAUTHORIZED);
                 }
-            } catch (MyException e) {
-                httpServletResponse.sendError(e.getHttpStatus().value(), e.getMessage());
-                return;
             }
+        } catch (MyException e) {
+            httpServletResponse.setStatus(e.getHttpStatus().value());
+            httpServletResponse.getWriter().write(objectMapper.writeValueAsString(e));
+            return;
         }
 
         filterChain.doFilter(httpServletRequest, httpServletResponse);

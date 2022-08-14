@@ -2,10 +2,7 @@ package com.deac.user.security;
 
 import com.deac.user.exception.MyException;
 import com.deac.user.persistence.entity.User;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -19,7 +16,7 @@ public class TokenProvider {
 
     private String secretKey = generateRandomSecretKey(10);
 
-    private final long validityInMilliseconds = 300000;
+    private final long validityInMilliseconds = 10000;
 
     @Autowired
     public TokenProvider() {
@@ -53,8 +50,10 @@ public class TokenProvider {
         try {
             Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token);
             return true;
+        } catch (ExpiredJwtException e) {
+            throw new MyException("Expired token", HttpStatus.UNAUTHORIZED);
         } catch (JwtException | IllegalArgumentException e) {
-            throw new MyException("Expired or invalid JWT token", HttpStatus.UNAUTHORIZED);
+            throw new MyException("Invalid token", HttpStatus.UNAUTHORIZED);
         }
     }
 

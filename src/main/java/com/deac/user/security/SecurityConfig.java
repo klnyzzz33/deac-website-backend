@@ -1,6 +1,6 @@
 package com.deac.user.security;
 
-import com.deac.user.service.UserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -26,9 +26,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     private final TokenProvider tokenProvider;
 
+    private final ObjectMapper objectMapper;
+
     @Autowired
-    public SecurityConfig(TokenProvider tokenProvider) {
+    public SecurityConfig(TokenProvider tokenProvider, ObjectMapper objectMapper) {
         this.tokenProvider = tokenProvider;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -37,7 +40,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         http.authorizeRequests()
                 .antMatchers("/api/**").permitAll()
                 .anyRequest().authenticated();
-        http.apply(new TokenFilterConfigurer(tokenProvider));
+        http.apply(new TokenFilterConfigurer(tokenProvider, objectMapper));
         http.cors().configurationSource(corsConfigurationSource());
     }
 

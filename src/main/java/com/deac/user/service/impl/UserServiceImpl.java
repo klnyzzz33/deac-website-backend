@@ -68,10 +68,9 @@ public class UserServiceImpl implements UserService {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
         } catch (AuthenticationException e) {
-            System.out.println("asd");
-            throw new MyException("Could not log in, invalid credentials", HttpStatus.UNAUTHORIZED);
+            throw new MyException("Invalid credentials", HttpStatus.UNAUTHORIZED);
         } catch (DataAccessException e) {
-            throw new MyException("Could not log in, internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -79,7 +78,7 @@ public class UserServiceImpl implements UserService {
     public String signUp(User user) {
         try {
             if (userRepository.existsByUsername(user.getUsername()) || userRepository.existsByEmail(user.getEmail())) {
-                throw new MyException("Could not register, username or email already exists", HttpStatus.CONFLICT);
+                throw new MyException("Username or email already exists", HttpStatus.CONFLICT);
             }
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             userRepository.save(user);
@@ -89,9 +88,9 @@ public class UserServiceImpl implements UserService {
             return "Successfully registered with user " + user.getUsername();
         } catch (MessagingException e) {
             userRepository.delete(user);
-            throw new MyException("Could not send registration confirmation email", HttpStatus.BAD_REQUEST);
+            throw new MyException("Could not send registration confirmation email", HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (DataAccessException e) {
-            throw new MyException("Could not register, internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -154,7 +153,7 @@ public class UserServiceImpl implements UserService {
         } catch (MessagingException e) {
             return "Recovery link sent if user exists";
         } catch (DataAccessException e) {
-            throw new MyException("Could not reset password, internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -182,7 +181,7 @@ public class UserServiceImpl implements UserService {
             passwordTokenRepository.deleteAllByUserId(userId);
             return "Password successfully reset";
         } catch (DataAccessException e) {
-            throw new MyException("Could not reset password, internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

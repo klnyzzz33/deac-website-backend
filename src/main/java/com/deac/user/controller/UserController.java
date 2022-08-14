@@ -37,7 +37,7 @@ public class UserController {
     public ResponseMessage login(@Valid @RequestBody LoginDto loginDto, HttpServletResponse response) {
         String token = userService.signIn(loginDto.getUsername(), loginDto.getPassword());
         Cookie cookie = new Cookie("jwt", token);
-        setCookie(cookie, 600);
+        setCookie(cookie, 900);
         response.addCookie(cookie);
         return new ResponseMessage(token);
     }
@@ -56,7 +56,7 @@ public class UserController {
     public ResponseMessage refresh(HttpServletResponse response) {
         String token = userService.refresh();
         Cookie cookie = new Cookie("jwt", token);
-        setCookie(cookie, 600);
+        setCookie(cookie, 900);
         response.addCookie(cookie);
         return new ResponseMessage(token);
     }
@@ -76,14 +76,6 @@ public class UserController {
         cookie.setHttpOnly(true);
         cookie.setPath("/");
     }
-
-    /*private boolean isValidToken(HttpServletRequest request) {
-        Optional<String> jwt = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("jwt")).map(Cookie::getValue).findFirst();
-        if (jwt.isEmpty()) {
-            throw new MyException("Expired cookie", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-        return userService.validateToken(jwt.get());
-    }*/
 
     @PostMapping("/api/user/forgot")
     public ResponseMessage sendPasswordRecoveryLink(@RequestBody String email) throws MessagingException {
