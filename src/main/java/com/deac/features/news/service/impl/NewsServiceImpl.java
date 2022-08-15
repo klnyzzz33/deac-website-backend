@@ -14,10 +14,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,7 +40,7 @@ public class NewsServiceImpl implements NewsService {
             newsRepository.save(news);
             return news.getId();
         } catch (DataAccessException e) {
-            throw new MyException("Could not create news, internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -59,7 +56,7 @@ public class NewsServiceImpl implements NewsService {
             newsRepository.deleteById(newsId);
             return "Successfully deleted news";
         } catch (DataAccessException e) {
-            throw new MyException("Could not delete news, internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -82,29 +79,41 @@ public class NewsServiceImpl implements NewsService {
             newsRepository.save(news);
             return "Successfully updated news";
         } catch (DataAccessException e) {
-            throw new MyException("Could not update news, internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     @Override
-    public List<NewsInfoDto> listNews() {
+    public List<NewsInfoDto> listNews(long min, long max) {
         try {
             List<News> newsList = newsRepository.findAll();
-            return newsList
+            List<NewsInfoDto> result = newsList
                     .stream()
                     .map(news -> {
                         ModifyEntry latestModifyEntry = news.getModifyEntries().stream().max(Comparator.comparing(ModifyEntry::getModifyDate)).orElse(null);
                         return new NewsInfoDto(news.getId(),
-                            news.getTitle(),
-                            news.getDescription(),
-                            news.getContent(),
-                            userService.getUser(news.getAuthorId()),
-                            news.getCreateDate(),
-                            latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
+                                news.getTitle(),
+                                news.getDescription(),
+                                news.getContent(),
+                                userService.getUser(news.getAuthorId()),
+                                news.getCreateDate(),
+                                latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
                     })
+                    .sorted(Comparator.comparing(NewsInfoDto::getCreateDate))
                     .collect(Collectors.toList());
+            Collections.reverse(result);
+            return result.subList((int) min, (int) max + 1);
         } catch (DataAccessException e) {
-            throw new MyException("Could not list news, internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public long getNumberOfNews() {
+        try {
+            return newsRepository.count();
+        } catch (DataAccessException e) {
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

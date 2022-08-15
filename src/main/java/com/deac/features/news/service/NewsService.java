@@ -2,7 +2,6 @@ package com.deac.features.news.service;
 
 import com.deac.features.news.model.ModifyDto;
 import com.deac.features.news.model.NewsInfoDto;
-import com.deac.features.news.persistance.entity.News;
 
 import java.util.List;
 
@@ -14,6 +13,8 @@ public interface NewsService {
 
     String updateNews(ModifyDto modifyDto);
 
-    List<NewsInfoDto> listNews();
+    List<NewsInfoDto> listNews(long min, long max);
+
+    long getNumberOfNews();
 
 }

@@ -16,7 +16,7 @@ public class TokenProvider {
 
     private String secretKey = generateRandomSecretKey(10);
 
-    private final long validityInMilliseconds = 10000;
+    private final long validityInMilliseconds = 300000;
 
     @Autowired
     public TokenProvider() {

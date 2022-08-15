@@ -6,10 +6,7 @@ import com.deac.features.news.model.NewsInfoDto;
 import com.deac.features.news.service.NewsService;
 import com.deac.user.model.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.util.List;
@@ -41,8 +38,20 @@ public class NewsController {
     }
 
     @GetMapping("/api/news/list")
-    public List<NewsInfoDto> listNews() {
-        return newsService.listNews();
+    public List<NewsInfoDto> listNews(@RequestParam(name = "pageNumber") long pageNumber,
+                                      @RequestParam(name = "entriesPerPage") long entriesPerPage) {
+        long maxIndex = newsService.getNumberOfNews() - 1;
+        long min = entriesPerPage * (pageNumber - 1);
+        if (min > maxIndex) {
+            return List.of();
+        }
+        long max = Math.min(entriesPerPage * (pageNumber - 1) + entriesPerPage - 1, maxIndex);
+        return newsService.listNews(min, max);
+    }
+
+    @GetMapping("/api/news/count")
+    public Long getNumberOfNews() {
+        return newsService.getNumberOfNews();
     }
 
 }
