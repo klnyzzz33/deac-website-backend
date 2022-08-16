@@ -1,4 +1,4 @@
-package com.deac.user.model;
+package com.deac.response;
 
 public class ResponseMessage {
 

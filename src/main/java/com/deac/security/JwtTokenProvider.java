@@ -1,6 +1,6 @@
-package com.deac.user.security;
+package com.deac.security;
 
-import com.deac.user.exception.MyException;
+import com.deac.exception.MyException;
 import com.deac.user.persistence.entity.User;
 import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,14 +12,14 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
-public class TokenProvider {
+public class JwtTokenProvider {
 
     private String secretKey = generateRandomSecretKey(10);
 
     private final long validityInMilliseconds = 300000;
 
     @Autowired
-    public TokenProvider() {
+    public JwtTokenProvider() {
         secretKey = Base64.getEncoder().encodeToString(secretKey.getBytes());
     }
 

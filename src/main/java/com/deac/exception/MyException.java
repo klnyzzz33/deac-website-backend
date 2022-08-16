@@ -1,4 +1,4 @@
-package com.deac.user.exception;
+package com.deac.exception;
 
 import org.springframework.http.HttpStatus;
 

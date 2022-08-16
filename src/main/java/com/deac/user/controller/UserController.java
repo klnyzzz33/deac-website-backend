@@ -1,24 +1,19 @@
 package com.deac.user.controller;
 
-import com.deac.user.exception.MyException;
 import com.deac.user.model.LoginDto;
 import com.deac.user.model.RegisterDto;
 import com.deac.user.model.ResetDto;
-import com.deac.user.model.ResponseMessage;
+import com.deac.response.ResponseMessage;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import javax.mail.MessagingException;
 import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
-import java.util.Arrays;
-import java.util.Optional;
 
 @RestController
 public class UserController {
@@ -45,6 +40,11 @@ public class UserController {
     @PostMapping("/api/user/register")
     public ResponseMessage register(@Valid @RequestBody RegisterDto registerDto) {
         return new ResponseMessage(userService.signUp(modelMapper.map(registerDto, User.class)));
+    }
+
+    @GetMapping("/api/user/verify")
+    public ResponseMessage verifyEmail(@RequestBody String token) {
+        return new ResponseMessage(userService.verifyEmail(token));
     }
 
     @GetMapping("/api/user/current_user")
@@ -83,7 +83,7 @@ public class UserController {
     }
 
     @PostMapping("/api/user/reset")
-    public ResponseMessage changePassword(@RequestBody ResetDto resetDto) {
+    public ResponseMessage changePassword(@Valid @RequestBody ResetDto resetDto) {
         return new ResponseMessage(userService.resetPassword(resetDto.getToken(), resetDto.getPassword()));
     }
 

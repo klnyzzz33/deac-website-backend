@@ -4,7 +4,7 @@ import com.deac.features.news.model.ModifyDto;
 import com.deac.features.news.model.NewsDto;
 import com.deac.features.news.model.NewsInfoDto;
 import com.deac.features.news.service.NewsService;
-import com.deac.user.model.ResponseMessage;
+import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -52,6 +52,12 @@ public class NewsController {
     @GetMapping("/api/news/count")
     public Long getNumberOfNews() {
         return newsService.getNumberOfNews();
+    }
+
+    @GetMapping("/api/news/open")
+    public NewsInfoDto getSingleNews(@RequestParam(name = "id") long id,
+                                     @RequestParam(name = "title") String title) {
+        return newsService.getSingleNews();
     }
 
 }

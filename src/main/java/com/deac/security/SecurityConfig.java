@@ -1,4 +1,4 @@
-package com.deac.user.security;
+package com.deac.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.modelmapper.ModelMapper;
@@ -24,13 +24,13 @@ import java.util.List;
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
-    private final TokenProvider tokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
 
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public SecurityConfig(TokenProvider tokenProvider, ObjectMapper objectMapper) {
-        this.tokenProvider = tokenProvider;
+    public SecurityConfig(JwtTokenProvider jwtTokenProvider, ObjectMapper objectMapper) {
+        this.jwtTokenProvider = jwtTokenProvider;
         this.objectMapper = objectMapper;
     }
 
@@ -40,7 +40,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         http.authorizeRequests()
                 .antMatchers("/api/**").permitAll()
                 .anyRequest().authenticated();
-        http.apply(new TokenFilterConfigurer(tokenProvider, objectMapper));
+        http.apply(new JwtTokenFilterConfigurer(jwtTokenProvider, objectMapper));
         http.cors().configurationSource(corsConfigurationSource());
     }
 

@@ -10,6 +10,8 @@ public interface UserService {
 
     String signUp(User user);
 
+    String verifyEmail(String token);
+
     String refresh();
 
     String signOut();

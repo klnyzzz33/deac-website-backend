@@ -7,7 +7,7 @@ import com.deac.features.news.persistance.entity.ModifyEntry;
 import com.deac.features.news.persistance.entity.News;
 import com.deac.features.news.persistance.repository.NewsRepository;
 import com.deac.features.news.service.NewsService;
-import com.deac.user.exception.MyException;
+import com.deac.exception.MyException;
 import com.deac.user.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
@@ -115,6 +115,10 @@ public class NewsServiceImpl implements NewsService {
         } catch (DataAccessException e) {
             throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    public NewsInfoDto getSingleNews() {
+        return null;
     }
 
 }

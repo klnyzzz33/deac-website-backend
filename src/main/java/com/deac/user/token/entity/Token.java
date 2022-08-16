@@ -1,4 +1,4 @@
-package com.deac.user.passwordtoken.entity;
+package com.deac.user.token.entity;
 
 import lombok.*;
 
@@ -10,12 +10,15 @@ import javax.persistence.*;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public class PasswordToken {
+public class Token {
 
     @EmbeddedId
-    private PasswordTokenKey tokenId;
+    private TokenKey tokenId;
 
     @Column(nullable = false)
     private Long expiresAt;
+
+    @Column(nullable = false)
+    private String purpose;
 
 }

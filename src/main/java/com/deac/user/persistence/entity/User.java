@@ -32,11 +32,15 @@ public class User {
     @ElementCollection(fetch = FetchType.EAGER)
     List<Role> roles;
 
+    @Column(nullable = false)
+    boolean isEnabled;
+
     public User(String username, String email, String password, List<Role> roles) {
         this.username = username;
         this.email = email;
         this.password = password;
         this.roles = roles;
+        this.isEnabled = false;
     }
 
     public enum Role implements GrantedAuthority {

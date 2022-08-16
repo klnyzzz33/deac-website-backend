@@ -1,4 +1,4 @@
-package com.deac.user.security;
+package com.deac.security;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;

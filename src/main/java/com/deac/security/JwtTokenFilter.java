@@ -1,6 +1,6 @@
-package com.deac.user.security;
+package com.deac.security;
 
-import com.deac.user.exception.MyException;
+import com.deac.exception.MyException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -22,16 +22,16 @@ import java.util.Arrays;
 import java.util.Optional;
 
 @Component
-public class TokenFilter extends OncePerRequestFilter {
+public class JwtTokenFilter extends OncePerRequestFilter {
 
     private static final String[] excludedEndPoints = new String[]{"/api/user/login", "/api/user/register", "/api/user/forgot", "/api/user/reset"};
 
-    private final TokenProvider tokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
 
     private final ObjectMapper objectMapper;
 
-    public TokenFilter(TokenProvider tokenProvider, ObjectMapper objectMapper) {
-        this.tokenProvider = tokenProvider;
+    public JwtTokenFilter(JwtTokenProvider jwtTokenProvider, ObjectMapper objectMapper) {
+        this.jwtTokenProvider = jwtTokenProvider;
         this.objectMapper = objectMapper;
     }
 
@@ -53,14 +53,14 @@ public class TokenFilter extends OncePerRequestFilter {
             }
             if (!httpServletRequest.getRequestURI().equals("/api/user/refresh") && !httpServletRequest.getRequestURI().equals("/api/user/logout")) {
                 try {
-                    tokenProvider.validateToken(jwt.get());
+                    jwtTokenProvider.validateToken(jwt.get());
                 } catch (ExpiredJwtException e) {
                     throw e;
                 } catch (JwtException | IllegalArgumentException e) {
                     SecurityContextHolder.clearContext();
                     throw e;
                 }
-                if (!tokenProvider.getUsernameFromToken(jwt.get()).equals(authentication.getName())) {
+                if (!jwtTokenProvider.getUsernameFromToken(jwt.get()).equals(authentication.getName())) {
                     SecurityContextHolder.clearContext();
                     throw new MyException("Invalid token", HttpStatus.UNAUTHORIZED);
                 }

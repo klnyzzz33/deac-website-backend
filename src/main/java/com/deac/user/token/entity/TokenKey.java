@@ -1,9 +1,6 @@
-package com.deac.user.passwordtoken.entity;
+package com.deac.user.token.entity;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import javax.persistence.*;
 import java.io.Serializable;
@@ -11,9 +8,10 @@ import java.io.Serializable;
 @Embeddable
 @Getter
 @Setter
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public class PasswordTokenKey implements Serializable {
+public class TokenKey implements Serializable {
 
     @Column(nullable = false)
     private Integer userId;

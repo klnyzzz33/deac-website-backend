@@ -1,14 +1,14 @@
 package com.deac.user.service.impl;
 
 import com.deac.mail.EmailService;
-import com.deac.user.exception.MyException;
+import com.deac.exception.MyException;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.persistence.repository.UserRepository;
-import com.deac.user.security.TokenProvider;
+import com.deac.security.JwtTokenProvider;
 import com.deac.user.service.UserService;
-import com.deac.user.passwordtoken.entity.PasswordToken;
-import com.deac.user.passwordtoken.entity.PasswordTokenKey;
-import com.deac.user.passwordtoken.repository.PasswordTokenRepository;
+import com.deac.user.token.entity.Token;
+import com.deac.user.token.entity.TokenKey;
+import com.deac.user.token.repository.TokenRepository;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,31 +33,33 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
 
-    private final PasswordTokenRepository passwordTokenRepository;
+    private final TokenRepository tokenRepository;
 
     private final PasswordEncoder passwordEncoder;
 
     private final AuthenticationManager authenticationManager;
 
-    private final TokenProvider tokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
 
     private final EmailService emailService;
 
     @Autowired
     public UserServiceImpl(UserRepository userRepository,
-                           PasswordTokenRepository passwordTokenRepository,
+                           TokenRepository tokenRepository,
                            PasswordEncoder passwordEncoder,
                            AuthenticationManager authenticationManager,
-                           TokenProvider tokenProvider,
+                           JwtTokenProvider jwtTokenProvider,
                            EmailService emailService) {
         this.userRepository = userRepository;
-        this.passwordTokenRepository = passwordTokenRepository;
+        this.tokenRepository = tokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
-        this.tokenProvider = tokenProvider;
+        this.jwtTokenProvider = jwtTokenProvider;
         this.emailService = emailService;
         if (!this.userRepository.existsByRoles(List.of(User.Role.ROLE_ADMIN))) {
-            this.userRepository.save(new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(User.Role.ROLE_ADMIN)));
+            User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(User.Role.ROLE_ADMIN));
+            admin.setEnabled(true);
+            this.userRepository.save(admin);
         }
     }
 
@@ -66,7 +68,11 @@ public class UserServiceImpl implements UserService {
         try {
             Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
+            User user = userRepository.findByUsername(username);
+            if (!user.isEnabled()) {
+                throw new MyException("Email not verified yet", HttpStatus.UNAUTHORIZED);
+            }
+            return jwtTokenProvider.createToken(username, user.getRoles());
         } catch (AuthenticationException e) {
             throw new MyException("Invalid credentials", HttpStatus.UNAUTHORIZED);
         } catch (DataAccessException e) {
@@ -82,9 +88,13 @@ public class UserServiceImpl implements UserService {
             }
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             userRepository.save(user);
+            String verifyToken = RandomStringUtils.randomAlphanumeric(64);
+            String verifyTokenHash = DigestUtils.sha256Hex(verifyToken);
+            Long expiresAt = System.currentTimeMillis() + 604800000;
+            tokenRepository.save(new Token(new TokenKey(user.getId(), verifyTokenHash), expiresAt, "verify-email"));
             emailService.sendMessage(user.getEmail(),
-                    "Successful registration",
-                    "<h3>Congratulations " + user.getUsername() + ", you have successfully registered to our website!</h3>");
+                    "Verify your email",
+                    "<h3>Congratulations " + user.getUsername() + ", you have successfully registered to our website! In order to use our site, please verify your email here:</h3><br>http://localhost:4200/reset?token=" + verifyToken);
             return "Successfully registered with user " + user.getUsername();
         } catch (MessagingException e) {
             userRepository.delete(user);
@@ -95,9 +105,41 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public String verifyEmail(String token) {
+        try {
+            String tokenHash = DigestUtils.sha256Hex(token);
+            if (!tokenRepository.existsByToken(tokenHash)) {
+                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
+            }
+            Token verifyToken = tokenRepository.findByToken(tokenHash);
+            Integer userId = verifyToken.getTokenId().getUserId();
+            Optional<User> userOptional = userRepository.findById(userId);
+            if (userOptional.isEmpty()) {
+                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
+            }
+            if (!verifyToken.getPurpose().equals("verify-email")) {
+                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
+            }
+            Long expiresAt = verifyToken.getExpiresAt();
+            if (System.currentTimeMillis() > expiresAt) {
+                tokenRepository.deleteByToken(tokenHash);
+                userRepository.deleteById(userId);
+                throw new MyException("Verify token expired", HttpStatus.BAD_REQUEST);
+            }
+            User user = userOptional.get();
+            user.setEnabled(true);
+            userRepository.save(user);
+            tokenRepository.deleteAllByUserIdAndPurpose(userId, "verify-email");
+            return "Email successfully verified";
+        } catch (DataAccessException e) {
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
     public String refresh() {
         String username = getCurrentUsername();
-        return tokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
+        return jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
     }
 
     @Override
@@ -145,7 +187,7 @@ public class UserServiceImpl implements UserService {
             String passwordToken = RandomStringUtils.randomAlphanumeric(64);
             String passwordTokenHash = DigestUtils.sha256Hex(passwordToken);
             Long expiresAt = System.currentTimeMillis() + 300000;
-            passwordTokenRepository.save(new PasswordToken(new PasswordTokenKey(user.getId(), passwordTokenHash), expiresAt));
+            tokenRepository.save(new Token(new TokenKey(user.getId(), passwordTokenHash), expiresAt, "password-reset"));
             emailService.sendMessage(email,
                     "Reset your password",
                     "<h3>You've issued a request to reset your password. In order to do that, please follow this link: </h3><br>http://localhost:4200/reset?token=" + passwordToken);
@@ -161,13 +203,13 @@ public class UserServiceImpl implements UserService {
     public String resetPassword(String token, String password) {
         try {
             String tokenHash = DigestUtils.sha256Hex(token);
-            if (!passwordTokenRepository.existsByToken(tokenHash)) {
+            if (!tokenRepository.existsByToken(tokenHash)) {
                 throw new MyException("Password reset failed", HttpStatus.BAD_REQUEST);
             }
-            PasswordToken passwordToken = passwordTokenRepository.findByToken(tokenHash);
+            Token passwordToken = tokenRepository.findByToken(tokenHash);
             Long expiresAt = passwordToken.getExpiresAt();
             if (System.currentTimeMillis() > expiresAt) {
-                passwordTokenRepository.deleteByToken(tokenHash);
+                tokenRepository.deleteByToken(tokenHash);
                 throw new MyException("Reset token expired", HttpStatus.BAD_REQUEST);
             }
             Integer userId = passwordToken.getTokenId().getUserId();
@@ -175,19 +217,39 @@ public class UserServiceImpl implements UserService {
             if (userOptional.isEmpty()) {
                 throw new MyException("Password reset failed", HttpStatus.BAD_REQUEST);
             }
+            if (!passwordToken.getPurpose().equals("password-reset")) {
+                throw new MyException("Password reset failed", HttpStatus.BAD_REQUEST);
+            }
             User user = userOptional.get();
             user.setPassword(passwordEncoder.encode(password));
             userRepository.save(user);
-            passwordTokenRepository.deleteAllByUserId(userId);
+            tokenRepository.deleteAllByUserIdAndPurpose(userId, "password-reset");
+            emailService.sendMessage(user.getEmail(),
+                    "Your password has been changed",
+                    "<h3>We've noticed that your password to your account has been changed. If this wasn't you, please contact our support immediately.");
             return "Password successfully reset";
+        } catch (MessagingException e) {
+            return "Recovery link sent if user exists";
         } catch (DataAccessException e) {
             throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     @Scheduled(fixedDelay = 300000)
-    public void deleteExpiredTokens() {
-        passwordTokenRepository.deleteAllByExpiresAtBefore(System.currentTimeMillis());
+    public void deleteExpiredPasswordTokens() {
+        tokenRepository.deleteAllByExpiresAtBeforeAndPurpose(System.currentTimeMillis(), "password-reset");
+    }
+
+    @Scheduled(fixedDelay = 604800000)
+    public void deleteExpiredVerifyTokens() {
+        long time = System.currentTimeMillis();
+        String purpose = "verify-email";
+        List<Token> tokensToDelete = tokenRepository.findAllByExpiresAtBeforeAndPurpose(time, purpose);
+        tokensToDelete.forEach(token -> {
+            Integer userId = token.getTokenId().getUserId();
+            userRepository.deleteById(userId);
+        });
+        tokenRepository.deleteAllByExpiresAtBeforeAndPurpose(time, purpose);
     }
 
 }

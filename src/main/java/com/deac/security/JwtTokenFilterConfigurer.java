@@ -1,4 +1,4 @@
-package com.deac.user.security;
+package com.deac.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.security.config.annotation.SecurityConfigurerAdapter;
@@ -8,20 +8,20 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.stereotype.Component;
 
 @Component
-public class TokenFilterConfigurer extends SecurityConfigurerAdapter<DefaultSecurityFilterChain, HttpSecurity> {
+public class JwtTokenFilterConfigurer extends SecurityConfigurerAdapter<DefaultSecurityFilterChain, HttpSecurity> {
 
-    private final TokenProvider tokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
 
     private final ObjectMapper objectMapper;
 
-    public TokenFilterConfigurer(TokenProvider tokenProvider, ObjectMapper objectMapper) {
-        this.tokenProvider = tokenProvider;
+    public JwtTokenFilterConfigurer(JwtTokenProvider jwtTokenProvider, ObjectMapper objectMapper) {
+        this.jwtTokenProvider = jwtTokenProvider;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public void configure(HttpSecurity http) {
-        TokenFilter customFilter = new TokenFilter(tokenProvider, objectMapper);
+        JwtTokenFilter customFilter = new JwtTokenFilter(jwtTokenProvider, objectMapper);
         http.addFilterBefore(customFilter, UsernamePasswordAuthenticationFilter.class);
     }
 

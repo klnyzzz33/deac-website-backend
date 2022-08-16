@@ -1,4 +1,4 @@
-package com.deac.user.security;
+package com.deac.security;
 
 import com.deac.user.persistence.entity.User;
 import com.deac.user.persistence.repository.UserRepository;
