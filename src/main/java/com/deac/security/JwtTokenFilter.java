@@ -24,7 +24,11 @@ import java.util.Optional;
 @Component
 public class JwtTokenFilter extends OncePerRequestFilter {
 
-    private static final String[] excludedEndPoints = new String[]{"/api/user/login", "/api/user/register", "/api/user/forgot", "/api/user/reset"};
+    private static final String[] excludedEndPoints = new String[]{"/api/user/login",
+            "/api/user/register",
+            "/api/user/forgot",
+            "/api/user/reset",
+            "/api/user/verify"};
 
     private final JwtTokenProvider jwtTokenProvider;
 

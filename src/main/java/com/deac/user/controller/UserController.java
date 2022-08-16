@@ -42,7 +42,7 @@ public class UserController {
         return new ResponseMessage(userService.signUp(modelMapper.map(registerDto, User.class)));
     }
 
-    @GetMapping("/api/user/verify")
+    @PostMapping("/api/user/verify")
     public ResponseMessage verifyEmail(@RequestBody String token) {
         return new ResponseMessage(userService.verifyEmail(token));
     }

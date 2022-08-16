@@ -94,7 +94,7 @@ public class UserServiceImpl implements UserService {
             tokenRepository.save(new Token(new TokenKey(user.getId(), verifyTokenHash), expiresAt, "verify-email"));
             emailService.sendMessage(user.getEmail(),
                     "Verify your email",
-                    "<h3>Congratulations " + user.getUsername() + ", you have successfully registered to our website! In order to use our site, please verify your email here:</h3><br>http://localhost:4200/reset?token=" + verifyToken);
+                    "<h3>Congratulations " + user.getUsername() + ", you have successfully registered to our website! In order to use our site, please verify your email here:</h3><br>http://localhost:4200/verify?token=" + verifyToken);
             return "Successfully registered with user " + user.getUsername();
         } catch (MessagingException e) {
             userRepository.delete(user);
