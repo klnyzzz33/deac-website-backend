@@ -1,10 +1,13 @@
 package com.deac.security;
 
 import com.deac.exception.MyException;
+import com.deac.user.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,27 +49,28 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
                 throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
             }
+
             if (httpServletRequest.getCookies() == null) {
                 SecurityContextHolder.clearContext();
-                throw new MyException("Expired cookie", HttpStatus.UNAUTHORIZED);
+                throw new MyException("Expired cookies", HttpStatus.UNAUTHORIZED);
             }
-            Optional<String> jwt = Arrays.stream(httpServletRequest.getCookies()).filter(cookie -> cookie.getName().equals("jwt")).map(Cookie::getValue).findFirst();
-            if (jwt.isEmpty()) {
-                SecurityContextHolder.clearContext();
-                throw new MyException("Expired cookie", HttpStatus.UNAUTHORIZED);
-            }
-            if (!httpServletRequest.getRequestURI().equals("/api/user/refresh") && !httpServletRequest.getRequestURI().equals("/api/user/logout")) {
+
+            if (!httpServletRequest.getRequestURI().equals("/api/user/refresh")) {
+                Optional<String> accessCookie = Arrays.stream(httpServletRequest.getCookies()).filter(cookie -> cookie.getName().equals("access-token")).map(Cookie::getValue).findFirst();
+                if (accessCookie.isEmpty()) {
+                    throw new MyException("Expired access cookie", HttpStatus.UNAUTHORIZED);
+                }
                 try {
-                    jwtTokenProvider.validateToken(jwt.get());
+                    jwtTokenProvider.validateToken(accessCookie.get());
                 } catch (ExpiredJwtException e) {
-                    throw e;
+                    throw new MyException("Expired access token", HttpStatus.UNAUTHORIZED);
                 } catch (JwtException | IllegalArgumentException e) {
                     SecurityContextHolder.clearContext();
-                    throw e;
+                    throw new MyException("Invalid access token", HttpStatus.UNAUTHORIZED);
                 }
-                if (!jwtTokenProvider.getUsernameFromToken(jwt.get()).equals(authentication.getName())) {
+                if (!jwtTokenProvider.getUsernameFromToken(accessCookie.get()).equals(authentication.getName())) {
                     SecurityContextHolder.clearContext();
-                    throw new MyException("Invalid token", HttpStatus.UNAUTHORIZED);
+                    throw new MyException("Invalid access token", HttpStatus.UNAUTHORIZED);
                 }
             }
         } catch (MyException e) {

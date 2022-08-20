@@ -1,19 +1,30 @@
 package com.deac.user.controller;
 
+import com.deac.exception.MyException;
 import com.deac.user.model.LoginDto;
 import com.deac.user.model.RegisterDto;
 import com.deac.user.model.ResetDto;
 import com.deac.response.ResponseMessage;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import javax.mail.MessagingException;
 import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 
 @RestController
 public class UserController {
@@ -30,11 +41,12 @@ public class UserController {
 
     @PostMapping("/api/user/login")
     public ResponseMessage login(@Valid @RequestBody LoginDto loginDto, HttpServletResponse response) {
-        String token = userService.signIn(loginDto.getUsername(), loginDto.getPassword());
-        Cookie cookie = new Cookie("jwt", token);
-        setCookie(cookie, 900);
-        response.addCookie(cookie);
-        return new ResponseMessage(token);
+        List<String> tokens = userService.signIn(loginDto.getUsername(), loginDto.getPassword());
+        ResponseCookie accessCookie = setCookie("access-token", tokens.get(0), 300, true);
+        ResponseCookie refreshCookie = setCookie("refresh-token", tokens.get(1), 604800, true);
+        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
+        return new ResponseMessage("Successfully logged in");
     }
 
     @PostMapping("/api/user/register")
@@ -52,29 +64,40 @@ public class UserController {
         return new ResponseMessage(userService.getCurrentUsername());
     }
 
-    @GetMapping("/api/user/refresh")
-    public ResponseMessage refresh(HttpServletResponse response) {
-        String token = userService.refresh();
-        Cookie cookie = new Cookie("jwt", token);
-        setCookie(cookie, 900);
-        response.addCookie(cookie);
-        return new ResponseMessage(token);
+    @PostMapping("/api/user/refresh")
+    public ResponseMessage refresh(HttpServletRequest request, HttpServletResponse response, @RequestBody String type) {
+        Optional<String> refreshCookie = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("refresh-token")).map(Cookie::getValue).findFirst();
+        if (refreshCookie.isEmpty()) {
+            userService.signOut();
+            throw new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED);
+        }
+        if (type.equals("access-token")) {
+            String accessToken = userService.refresh(refreshCookie.get());
+            ResponseCookie accessCookie = setCookie("access-token", accessToken, 300, true);
+            response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
+        }
+        return new ResponseMessage("Successfully refreshed session");
     }
 
     @GetMapping("/api/user/logout")
     public ResponseMessage logout(HttpServletResponse response) {
         String responseString = userService.signOut();
-        Cookie cookie = new Cookie("jwt", null);
-        setCookie(cookie, 0);
-        response.addCookie(cookie);
+        ResponseCookie accessCookie = setCookie("access-token", "", 0, true);
+        ResponseCookie refreshCookie = setCookie("refresh-token", "", 0, true);
+        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
         return new ResponseMessage(responseString);
     }
 
-    private void setCookie(Cookie cookie, int age) {
-        cookie.setMaxAge(age);
-        cookie.setSecure(false);
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
+    private ResponseCookie setCookie(String name, String value, int age, boolean httpOnly) {
+        return ResponseCookie
+                .from(name, value)
+                .maxAge(age)
+                .httpOnly(httpOnly)
+                .sameSite("Strict")
+                .secure(false)
+                .path("/")
+                .build();
     }
 
     @PostMapping("/api/user/forgot")

@@ -16,7 +16,9 @@ public class JwtTokenProvider {
 
     private String secretKey = generateRandomSecretKey(10);
 
-    private final long validityInMilliseconds = 300000;
+    private final long accessTokenValidityInMilliseconds = 15000;
+
+    private final long refreshTokenValidityInMilliseconds = 3600000;
 
     @Autowired
     public JwtTokenProvider() {
@@ -33,11 +35,12 @@ public class JwtTokenProvider {
         return builder.toString();
     }
 
-    public String createToken(String username, List<User.Role> roles) {
+    public String createToken(String username, List<User.Role> roles, String type) {
         Claims claims = Jwts.claims().setSubject(username);
         claims.put("auth", roles.stream().map(role -> new SimpleGrantedAuthority(role.getAuthority())).collect(Collectors.toList()));
+        claims.put("type", type);
         Date now = new Date();
-        Date validity = new Date(now.getTime() + validityInMilliseconds);
+        Date validity = new Date(now.getTime() + (type.equals("access-token") ? accessTokenValidityInMilliseconds : refreshTokenValidityInMilliseconds));
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(now)
@@ -47,14 +50,8 @@ public class JwtTokenProvider {
     }
 
     public boolean validateToken(String token) {
-        try {
-            Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token);
-            return true;
-        } catch (ExpiredJwtException e) {
-            throw new MyException("Expired token", HttpStatus.UNAUTHORIZED);
-        } catch (JwtException | IllegalArgumentException e) {
-            throw new MyException("Invalid token", HttpStatus.UNAUTHORIZED);
-        }
+        Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token);
+        return true;
     }
 
     public String getUsernameFromToken(String token) {

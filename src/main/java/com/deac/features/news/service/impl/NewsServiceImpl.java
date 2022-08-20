@@ -94,7 +94,7 @@ public class NewsServiceImpl implements NewsService {
                         return new NewsInfoDto(news.getId(),
                                 news.getTitle(),
                                 news.getDescription(),
-                                news.getContent(),
+                                null,
                                 userService.getUser(news.getAuthorId()),
                                 news.getCreateDate(),
                                 latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
@@ -117,8 +117,24 @@ public class NewsServiceImpl implements NewsService {
         }
     }
 
-    public NewsInfoDto getSingleNews() {
-        return null;
+    public NewsInfoDto getSingleNews(Integer id) {
+        try {
+            Optional<News> newsOptional = newsRepository.findById(id);
+            if (newsOptional.isEmpty()) {
+                throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
+            }
+            News news = newsOptional.get();
+            ModifyEntry latestModifyEntry = news.getModifyEntries().stream().max(Comparator.comparing(ModifyEntry::getModifyDate)).orElse(null);
+            return new NewsInfoDto(news.getId(),
+                    news.getTitle(),
+                    news.getDescription(),
+                    news.getContent(),
+                    userService.getUser(news.getAuthorId()),
+                    news.getCreateDate(),
+                    latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
+        } catch (DataAccessException e) {
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
 }

@@ -9,6 +9,8 @@ import com.deac.user.service.UserService;
 import com.deac.user.token.entity.Token;
 import com.deac.user.token.entity.TokenKey;
 import com.deac.user.token.repository.TokenRepository;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.mail.MessagingException;
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -64,7 +71,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public String signIn(String username, String password) {
+    public List<String> signIn(String username, String password) {
         try {
             Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
             SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -72,7 +79,9 @@ public class UserServiceImpl implements UserService {
             if (!user.isEnabled()) {
                 throw new MyException("Email not verified yet", HttpStatus.UNAUTHORIZED);
             }
-            return jwtTokenProvider.createToken(username, user.getRoles());
+            String accessToken = jwtTokenProvider.createToken(username, user.getRoles(), "access-token");
+            String refreshToken = jwtTokenProvider.createToken(username, user.getRoles(), "refresh-token");
+            return List.of(accessToken, refreshToken);
         } catch (AuthenticationException e) {
             throw new MyException("Invalid credentials", HttpStatus.UNAUTHORIZED);
         } catch (DataAccessException e) {
@@ -105,41 +114,26 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public String verifyEmail(String token) {
-        try {
-            String tokenHash = DigestUtils.sha256Hex(token);
-            if (!tokenRepository.existsByToken(tokenHash)) {
-                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
-            }
-            Token verifyToken = tokenRepository.findByToken(tokenHash);
-            Integer userId = verifyToken.getTokenId().getUserId();
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
-            }
-            if (!verifyToken.getPurpose().equals("verify-email")) {
-                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
-            }
-            Long expiresAt = verifyToken.getExpiresAt();
-            if (System.currentTimeMillis() > expiresAt) {
-                tokenRepository.deleteByToken(tokenHash);
-                userRepository.deleteById(userId);
-                throw new MyException("Verify token expired", HttpStatus.BAD_REQUEST);
-            }
-            User user = userOptional.get();
-            user.setEnabled(true);
-            userRepository.save(user);
-            tokenRepository.deleteAllByUserIdAndPurpose(userId, "verify-email");
-            return "Email successfully verified";
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public String refresh(String refreshToken) {
+        String username = getCurrentUsername();
+        validateRefreshToken(refreshToken, username);
+        return jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "access-token");
     }
 
-    @Override
-    public String refresh() {
-        String username = getCurrentUsername();
-        return jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles());
+    private boolean validateRefreshToken(String refreshToken, String username) {
+        try {
+            jwtTokenProvider.validateToken(refreshToken);
+        } catch (ExpiredJwtException e) {
+            throw new MyException("Expired refresh token", HttpStatus.UNAUTHORIZED);
+        } catch (JwtException | IllegalArgumentException e) {
+            signOut();
+            throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
+        }
+        if (!jwtTokenProvider.getUsernameFromToken(refreshToken).equals(username)) {
+            signOut();
+            throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
+        }
+        return true;
     }
 
     @Override
@@ -230,6 +224,38 @@ public class UserServiceImpl implements UserService {
             return "Password successfully reset";
         } catch (MessagingException e) {
             return "Recovery link sent if user exists";
+        } catch (DataAccessException e) {
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public String verifyEmail(String token) {
+        try {
+            String tokenHash = DigestUtils.sha256Hex(token);
+            if (!tokenRepository.existsByToken(tokenHash)) {
+                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
+            }
+            Token verifyToken = tokenRepository.findByToken(tokenHash);
+            Integer userId = verifyToken.getTokenId().getUserId();
+            Optional<User> userOptional = userRepository.findById(userId);
+            if (userOptional.isEmpty()) {
+                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
+            }
+            if (!verifyToken.getPurpose().equals("verify-email")) {
+                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
+            }
+            Long expiresAt = verifyToken.getExpiresAt();
+            if (System.currentTimeMillis() > expiresAt) {
+                tokenRepository.deleteByToken(tokenHash);
+                userRepository.deleteById(userId);
+                throw new MyException("Verify token expired", HttpStatus.BAD_REQUEST);
+            }
+            User user = userOptional.get();
+            user.setEnabled(true);
+            userRepository.save(user);
+            tokenRepository.deleteAllByUserIdAndPurpose(userId, "verify-email");
+            return "Email successfully verified";
         } catch (DataAccessException e) {
             throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }

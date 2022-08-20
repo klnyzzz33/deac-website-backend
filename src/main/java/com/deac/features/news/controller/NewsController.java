@@ -55,9 +55,8 @@ public class NewsController {
     }
 
     @GetMapping("/api/news/open")
-    public NewsInfoDto getSingleNews(@RequestParam(name = "id") long id,
-                                     @RequestParam(name = "title") String title) {
-        return newsService.getSingleNews();
+    public NewsInfoDto getSingleNews(@RequestParam(name = "id") Integer id) {
+        return newsService.getSingleNews(id);
     }
 
 }

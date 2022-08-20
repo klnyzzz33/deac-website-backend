@@ -3,16 +3,15 @@ package com.deac.user.service;
 import com.deac.user.persistence.entity.User;
 
 import javax.mail.MessagingException;
+import java.util.List;
 
 public interface UserService {
 
-    String signIn(String username, String password);
+    List<String> signIn(String username, String password);
 
     String signUp(User user);
 
-    String verifyEmail(String token);
-
-    String refresh();
+    String refresh(String refreshToken);
 
     String signOut();
 
@@ -27,5 +26,7 @@ public interface UserService {
     String recoverPassword(String email) throws MessagingException;
 
     String resetPassword(String token, String password);
+
+    String verifyEmail(String token);
 
 }

@@ -1,6 +1,5 @@
 package com.deac.features.news.model;
 
-import com.deac.features.news.persistance.entity.ModifyEntry;
 import lombok.*;
 
 import java.util.Date;

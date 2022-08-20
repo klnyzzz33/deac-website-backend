@@ -17,6 +17,6 @@ public interface NewsService {
 
     long getNumberOfNews();
 
-    NewsInfoDto getSingleNews();
+    NewsInfoDto getSingleNews(Integer id);
 
 }
