@@ -1,10 +1,8 @@
 package com.deac.security;
 
-import com.deac.exception.MyException;
 import com.deac.user.persistence.entity.User;
 import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
@@ -16,9 +14,9 @@ public class JwtTokenProvider {
 
     private String secretKey = generateRandomSecretKey(10);
 
-    private final long accessTokenValidityInMilliseconds = 15000;
+    private final long accessTokenValidityInMilliseconds = /*300000*/5000;
 
-    private final long refreshTokenValidityInMilliseconds = 3600000;
+    private final long refreshTokenValidityInMilliseconds = 604800000;
 
     @Autowired
     public JwtTokenProvider() {

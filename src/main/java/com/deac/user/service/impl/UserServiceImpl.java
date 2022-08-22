@@ -124,6 +124,7 @@ public class UserServiceImpl implements UserService {
         try {
             jwtTokenProvider.validateToken(refreshToken);
         } catch (ExpiredJwtException e) {
+            signOut();
             throw new MyException("Expired refresh token", HttpStatus.UNAUTHORIZED);
         } catch (JwtException | IllegalArgumentException e) {
             signOut();

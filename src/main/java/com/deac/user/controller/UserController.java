@@ -7,14 +7,11 @@ import com.deac.user.model.ResetDto;
 import com.deac.response.ResponseMessage;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import javax.mail.MessagingException;
@@ -65,18 +62,24 @@ public class UserController {
     }
 
     @PostMapping("/api/user/refresh")
-    public ResponseMessage refresh(HttpServletRequest request, HttpServletResponse response, @RequestBody String type) {
+    public ResponseMessage refresh(HttpServletRequest request, HttpServletResponse response) {
         Optional<String> refreshCookie = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("refresh-token")).map(Cookie::getValue).findFirst();
-        if (refreshCookie.isEmpty()) {
-            userService.signOut();
-            throw new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED);
-        }
-        if (type.equals("access-token")) {
+        try {
+            if (refreshCookie.isEmpty()) {
+                userService.signOut();
+                throw new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED);
+            }
             String accessToken = userService.refresh(refreshCookie.get());
             ResponseCookie accessCookie = setCookie("access-token", accessToken, 300, true);
             response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
+            return new ResponseMessage("Successfully refreshed session");
+        } catch (MyException e) {
+            ResponseCookie newAccessCookie = setCookie("access-token", "", 0, true);
+            ResponseCookie newRefreshCookie = setCookie("refresh-token", "", 0, true);
+            response.addHeader(HttpHeaders.SET_COOKIE, newAccessCookie.toString());
+            response.addHeader(HttpHeaders.SET_COOKIE, newRefreshCookie.toString());
+            throw e;
         }
-        return new ResponseMessage("Successfully refreshed session");
     }
 
     @GetMapping("/api/user/logout")

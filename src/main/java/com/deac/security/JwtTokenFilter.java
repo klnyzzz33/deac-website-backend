@@ -55,7 +55,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                 throw new MyException("Expired cookies", HttpStatus.UNAUTHORIZED);
             }
 
-            if (!httpServletRequest.getRequestURI().equals("/api/user/refresh")) {
+            if (!httpServletRequest.getRequestURI().equals("/api/user/refresh") && !httpServletRequest.getRequestURI().equals("/api/user/logout")) {
                 Optional<String> accessCookie = Arrays.stream(httpServletRequest.getCookies()).filter(cookie -> cookie.getName().equals("access-token")).map(Cookie::getValue).findFirst();
                 if (accessCookie.isEmpty()) {
                     throw new MyException("Expired access cookie", HttpStatus.UNAUTHORIZED);
@@ -75,7 +75,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             }
         } catch (MyException e) {
             httpServletResponse.setStatus(e.getHttpStatus().value());
-            httpServletResponse.getWriter().write(objectMapper.writeValueAsString(e));
+            httpServletResponse.getWriter().write(objectMapper.writeValueAsString(e.getMessage()));
             return;
         }
 
