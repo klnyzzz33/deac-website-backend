@@ -14,7 +14,7 @@ public class JwtTokenProvider {
 
     private String secretKey = generateRandomSecretKey(10);
 
-    private final long accessTokenValidityInMilliseconds = /*300000*/5000;
+    private final long accessTokenValidityInMilliseconds = 300000;
 
     private final long refreshTokenValidityInMilliseconds = 604800000;
 
