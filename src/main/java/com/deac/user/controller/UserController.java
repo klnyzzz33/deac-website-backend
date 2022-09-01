@@ -9,6 +9,7 @@ import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -30,6 +31,12 @@ public class UserController {
 
     private final ModelMapper modelMapper;
 
+    @Value("${jwt.access.validity}")
+    private long accessCookieAge;
+
+    @Value("${jwt.refresh.absolute.validity}")
+    private long refreshCookieAge;
+
     @Autowired
     public UserController(UserService userService, ModelMapper modelMapper) {
         this.userService = userService;
@@ -39,8 +46,8 @@ public class UserController {
     @PostMapping("/api/user/login")
     public ResponseMessage login(@Valid @RequestBody LoginDto loginDto, HttpServletResponse response) {
         List<String> tokens = userService.signIn(loginDto.getUsername(), loginDto.getPassword());
-        ResponseCookie accessCookie = setCookie("access-token", tokens.get(0), 300, true);
-        ResponseCookie refreshCookie = setCookie("refresh-token", tokens.get(1), 604800, true);
+        ResponseCookie accessCookie = setCookie("access-token", tokens.get(0), accessCookieAge, true);
+        ResponseCookie refreshCookie = setCookie("refresh-token", tokens.get(1), refreshCookieAge, true);
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
         return new ResponseMessage("Successfully logged in");
@@ -70,8 +77,8 @@ public class UserController {
                 throw new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED);
             }
             List<String> tokens = userService.refresh(refreshCookie.get());
-            ResponseCookie newAccessCookie = setCookie("access-token", tokens.get(0), 300, true);
-            ResponseCookie newRefreshCookie = setCookie("refresh-token", tokens.get(1), 604800, true);
+            ResponseCookie newAccessCookie = setCookie("access-token", tokens.get(0), accessCookieAge, true);
+            ResponseCookie newRefreshCookie = setCookie("refresh-token", tokens.get(1), refreshCookieAge, true);
             response.addHeader(HttpHeaders.SET_COOKIE, newAccessCookie.toString());
             response.addHeader(HttpHeaders.SET_COOKIE, newRefreshCookie.toString());
             return new ResponseMessage("Successfully refreshed session");
@@ -94,7 +101,7 @@ public class UserController {
         return new ResponseMessage(responseString);
     }
 
-    private ResponseCookie setCookie(String name, String value, int age, boolean httpOnly) {
+    private ResponseCookie setCookie(String name, String value, long age, boolean httpOnly) {
         return ResponseCookie
                 .from(name, value)
                 .maxAge(age)

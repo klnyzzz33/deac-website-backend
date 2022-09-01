@@ -3,7 +3,6 @@ package com.deac.security;
 import com.deac.user.persistence.entity.User;
 import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
@@ -26,9 +25,9 @@ public class JwtTokenProvider {
 
     @Autowired
     public JwtTokenProvider(Environment environment) {
-        accessTokenValidityInMilliseconds = Long.parseLong(Objects.requireNonNull(environment.getProperty("jwt.access.validity"))) * 1000;
-        refreshTokenSlidingValidityInMilliseconds = Long.parseLong(Objects.requireNonNull(environment.getProperty("jwt.refresh.sliding.validity"))) * 1000;
-        refreshTokenAbsoluteValidityInMilliseconds = Long.parseLong(Objects.requireNonNull(environment.getProperty("jwt.refresh.absolute.validity"))) * 1000;
+        accessTokenValidityInMilliseconds = Objects.requireNonNull(environment.getProperty("jwt.access.validity", Long.class)) * 1000;
+        refreshTokenSlidingValidityInMilliseconds = Objects.requireNonNull(environment.getProperty("jwt.refresh.sliding.validity", Long.class)) * 1000;
+        refreshTokenAbsoluteValidityInMilliseconds = Objects.requireNonNull(environment.getProperty("jwt.refresh.absolute.validity", Long.class)) * 1000;
         secretKey = Base64.getEncoder().encodeToString(secretKey.getBytes());
     }
 
