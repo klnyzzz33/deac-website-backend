@@ -27,11 +27,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.mail.MessagingException;
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -79,8 +75,9 @@ public class UserServiceImpl implements UserService {
             if (!user.isEnabled()) {
                 throw new MyException("Email not verified yet", HttpStatus.UNAUTHORIZED);
             }
-            String accessToken = jwtTokenProvider.createToken(username, user.getRoles(), "access-token");
-            String refreshToken = jwtTokenProvider.createToken(username, user.getRoles(), "refresh-token");
+            Date absoluteValidity = new Date(new Date().getTime() + jwtTokenProvider.getRefreshTokenAbsoluteValidityInMilliseconds());
+            String accessToken = jwtTokenProvider.createToken(username, user.getRoles(), "access-token", null);
+            String refreshToken = jwtTokenProvider.createToken(username, user.getRoles(), "refresh-token", absoluteValidity);
             return List.of(accessToken, refreshToken);
         } catch (AuthenticationException e) {
             throw new MyException("Invalid credentials", HttpStatus.UNAUTHORIZED);
@@ -103,7 +100,7 @@ public class UserServiceImpl implements UserService {
             tokenRepository.save(new Token(new TokenKey(user.getId(), verifyTokenHash), expiresAt, "verify-email"));
             emailService.sendMessage(user.getEmail(),
                     "Verify your email",
-                    "<h3>Congratulations " + user.getUsername() + ", you have successfully registered to our website! In order to use our site, please verify your email here:</h3><br>http://localhost:4200/verify?token=" + verifyToken);
+                    "<h3>Congratulations " + user.getUsername() + ", you have successfully registered to our website! In order to use our site, please verify your email here:</h3><br>http://localhost:4200/verify?token=" + verifyToken + "<br><h3>The link expires in 1 week, if you do not verify your email in the given time, we'll cancel your registration.<h3>");
             return "Successfully registered with user " + user.getUsername();
         } catch (MessagingException e) {
             userRepository.delete(user);
@@ -114,10 +111,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public String refresh(String refreshToken) {
+    public List<String> refresh(String refreshToken) {
         String username = getCurrentUsername();
         validateRefreshToken(refreshToken, username);
-        return jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "access-token");
+        Date absoluteValidity = jwtTokenProvider.getAbsoluteExpirationTimeFromToken(refreshToken);
+        String newAccessToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "access-token", null);
+        String newRefreshToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "refresh-token", absoluteValidity);
+        return List.of(newAccessToken, newRefreshToken);
     }
 
     private boolean validateRefreshToken(String refreshToken, String username) {
@@ -130,7 +130,7 @@ public class UserServiceImpl implements UserService {
             signOut();
             throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
         }
-        if (!jwtTokenProvider.getUsernameFromToken(refreshToken).equals(username)) {
+        if (!jwtTokenProvider.getUsernameFromToken(refreshToken).equals(username) || !jwtTokenProvider.getTypeFromToken(refreshToken).equals("refresh-token")) {
             signOut();
             throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
         }

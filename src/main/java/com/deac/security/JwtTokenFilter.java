@@ -1,13 +1,10 @@
 package com.deac.security;
 
 import com.deac.exception.MyException;
-import com.deac.user.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -68,7 +65,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                     SecurityContextHolder.clearContext();
                     throw new MyException("Invalid access token", HttpStatus.UNAUTHORIZED);
                 }
-                if (!jwtTokenProvider.getUsernameFromToken(accessCookie.get()).equals(authentication.getName())) {
+                if (!jwtTokenProvider.getUsernameFromToken(accessCookie.get()).equals(authentication.getName()) || !jwtTokenProvider.getTypeFromToken(accessCookie.get()).equals("access-token")) {
                     SecurityContextHolder.clearContext();
                     throw new MyException("Invalid access token", HttpStatus.UNAUTHORIZED);
                 }

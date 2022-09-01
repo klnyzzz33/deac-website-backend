@@ -3,23 +3,32 @@ package com.deac.security;
 import com.deac.user.persistence.entity.User;
 import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.lang.Math.min;
+
 @Component
 public class JwtTokenProvider {
 
     private String secretKey = generateRandomSecretKey(10);
 
-    private final long accessTokenValidityInMilliseconds = 300000;
+    private final long accessTokenValidityInMilliseconds;
 
-    private final long refreshTokenValidityInMilliseconds = 604800000;
+    private final long refreshTokenSlidingValidityInMilliseconds;
+
+    private final long refreshTokenAbsoluteValidityInMilliseconds;
 
     @Autowired
-    public JwtTokenProvider() {
+    public JwtTokenProvider(Environment environment) {
+        accessTokenValidityInMilliseconds = Long.parseLong(Objects.requireNonNull(environment.getProperty("jwt.access.validity"))) * 1000;
+        refreshTokenSlidingValidityInMilliseconds = Long.parseLong(Objects.requireNonNull(environment.getProperty("jwt.refresh.sliding.validity"))) * 1000;
+        refreshTokenAbsoluteValidityInMilliseconds = Long.parseLong(Objects.requireNonNull(environment.getProperty("jwt.refresh.absolute.validity"))) * 1000;
         secretKey = Base64.getEncoder().encodeToString(secretKey.getBytes());
     }
 
@@ -33,12 +42,21 @@ public class JwtTokenProvider {
         return builder.toString();
     }
 
-    public String createToken(String username, List<User.Role> roles, String type) {
+    public long getRefreshTokenAbsoluteValidityInMilliseconds() {
+        return refreshTokenAbsoluteValidityInMilliseconds;
+    }
+
+    public String createToken(String username, List<User.Role> roles, String type, Date absoluteExpirationTime) {
         Claims claims = Jwts.claims().setSubject(username);
         claims.put("auth", roles.stream().map(role -> new SimpleGrantedAuthority(role.getAuthority())).collect(Collectors.toList()));
         claims.put("type", type);
+        if (absoluteExpirationTime != null) {
+            claims.put("absexp", absoluteExpirationTime);
+        }
         Date now = new Date();
-        Date validity = new Date(now.getTime() + (type.equals("access-token") ? accessTokenValidityInMilliseconds : refreshTokenValidityInMilliseconds));
+        Date validity = new Date(now.getTime() + (type.equals("access-token")
+                ? accessTokenValidityInMilliseconds
+                : min(Objects.requireNonNull(absoluteExpirationTime).getTime() - now.getTime(), refreshTokenSlidingValidityInMilliseconds)));
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(now)
@@ -54,6 +72,15 @@ public class JwtTokenProvider {
 
     public String getUsernameFromToken(String token) {
         return Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody().getSubject();
+    }
+
+    public String getTypeFromToken(String token) {
+        return (String) Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody().get("type");
+    }
+
+    public Date getAbsoluteExpirationTimeFromToken(String token) {
+        long value = (long) Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody().get("absexp");
+        return new Date(value);
     }
 
 }

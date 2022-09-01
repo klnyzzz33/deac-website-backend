@@ -69,9 +69,11 @@ public class UserController {
                 userService.signOut();
                 throw new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED);
             }
-            String accessToken = userService.refresh(refreshCookie.get());
-            ResponseCookie accessCookie = setCookie("access-token", accessToken, 300, true);
-            response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
+            List<String> tokens = userService.refresh(refreshCookie.get());
+            ResponseCookie newAccessCookie = setCookie("access-token", tokens.get(0), 300, true);
+            ResponseCookie newRefreshCookie = setCookie("refresh-token", tokens.get(1), 604800, true);
+            response.addHeader(HttpHeaders.SET_COOKIE, newAccessCookie.toString());
+            response.addHeader(HttpHeaders.SET_COOKIE, newRefreshCookie.toString());
             return new ResponseMessage("Successfully refreshed session");
         } catch (MyException e) {
             ResponseCookie newAccessCookie = setCookie("access-token", "", 0, true);

@@ -11,7 +11,7 @@ public interface UserService {
 
     String signUp(User user);
 
-    String refresh(String refreshToken);
+    List<String> refresh(String refreshToken);
 
     String signOut();
 
