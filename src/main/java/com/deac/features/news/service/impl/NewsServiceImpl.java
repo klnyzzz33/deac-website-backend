@@ -1,8 +1,8 @@
 package com.deac.features.news.service.impl;
 
-import com.deac.features.news.model.ModifyDto;
-import com.deac.features.news.model.ModifyInfoDto;
-import com.deac.features.news.model.NewsInfoDto;
+import com.deac.features.news.dto.ModifyDto;
+import com.deac.features.news.dto.ModifyInfoDto;
+import com.deac.features.news.dto.NewsInfoDto;
 import com.deac.features.news.persistance.entity.ModifyEntry;
 import com.deac.features.news.persistance.entity.News;
 import com.deac.features.news.persistance.repository.NewsRepository;

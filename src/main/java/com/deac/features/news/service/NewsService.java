@@ -1,7 +1,7 @@
 package com.deac.features.news.service;
 
-import com.deac.features.news.model.ModifyDto;
-import com.deac.features.news.model.NewsInfoDto;
+import com.deac.features.news.dto.ModifyDto;
+import com.deac.features.news.dto.NewsInfoDto;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package com.deac.user.model;
+package com.deac.user.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,10 +11,10 @@ import javax.validation.constraints.NotNull;
 @Setter
 @ToString
 @NoArgsConstructor
-public class LoginDto {
+public class ResetDto {
 
-    @NotNull(message = "Username not specified")
-    private String username;
+    @NotNull(message = "Token not specified")
+    private String token;
 
     @NotNull(message = "Password not specified")
     private String password;

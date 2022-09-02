@@ -1,7 +1,6 @@
-package com.deac.user.model;
+package com.deac.user.dto;
 
-import com.deac.user.persistence.entity.User;
-import io.swagger.annotations.ApiModelProperty;
+import com.deac.user.persistence.entity.Role;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -17,6 +16,6 @@ public class UserDto {
 
     private String email;
 
-    List<User.Role> roles;
+    List<Role> roles;
 
 }

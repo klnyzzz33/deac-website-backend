@@ -1,7 +1,7 @@
 package com.deac.user.persistence.repository;
 
+import com.deac.user.persistence.entity.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import com.deac.user.persistence.entity.User;
@@ -19,6 +19,6 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     User findByEmail(String email);
 
-    boolean existsByRoles(@Param("roles") List<User.Role> roles);
+    boolean existsByRoles(@Param("roles") List<Role> roles);
 
 }

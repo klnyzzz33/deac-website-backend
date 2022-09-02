@@ -1,8 +1,8 @@
 package com.deac.features.news.controller;
 
-import com.deac.features.news.model.ModifyDto;
-import com.deac.features.news.model.NewsDto;
-import com.deac.features.news.model.NewsInfoDto;
+import com.deac.features.news.dto.ModifyDto;
+import com.deac.features.news.dto.NewsDto;
+import com.deac.features.news.dto.NewsInfoDto;
 import com.deac.features.news.service.NewsService;
 import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;

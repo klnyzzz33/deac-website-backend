@@ -1,9 +1,9 @@
 package com.deac.user.controller;
 
 import com.deac.exception.MyException;
-import com.deac.user.model.LoginDto;
-import com.deac.user.model.RegisterDto;
-import com.deac.user.model.ResetDto;
+import com.deac.user.dto.LoginDto;
+import com.deac.user.dto.RegisterDto;
+import com.deac.user.dto.ResetDto;
 import com.deac.response.ResponseMessage;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;

@@ -43,15 +43,4 @@ public class User {
         this.isEnabled = false;
     }
 
-    public enum Role implements GrantedAuthority {
-
-        ROLE_ADMIN,
-        ROLE_CLIENT;
-
-        public String getAuthority() {
-            return name();
-        }
-
-    }
-
 }

@@ -1,6 +1,6 @@
 package com.deac.security;
 
-import com.deac.user.persistence.entity.User;
+import com.deac.user.persistence.entity.Role;
 import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -45,7 +45,7 @@ public class JwtTokenProvider {
         return refreshTokenAbsoluteValidityInMilliseconds;
     }
 
-    public String createToken(String username, List<User.Role> roles, String type, Date absoluteExpirationTime) {
+    public String createToken(String username, List<Role> roles, String type, Date absoluteExpirationTime) {
         Claims claims = Jwts.claims().setSubject(username);
         claims.put("auth", roles.stream().map(role -> new SimpleGrantedAuthority(role.getAuthority())).collect(Collectors.toList()));
         claims.put("type", type);

@@ -2,6 +2,7 @@ package com.deac.user.service.impl;
 
 import com.deac.mail.EmailService;
 import com.deac.exception.MyException;
+import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.persistence.repository.UserRepository;
 import com.deac.security.JwtTokenProvider;
@@ -23,6 +24,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +36,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl implements UserService, UserDetailsService {
 
     private final UserRepository userRepository;
 
@@ -59,8 +63,8 @@ public class UserServiceImpl implements UserService {
         this.authenticationManager = authenticationManager;
         this.jwtTokenProvider = jwtTokenProvider;
         this.emailService = emailService;
-        if (!this.userRepository.existsByRoles(List.of(User.Role.ROLE_ADMIN))) {
-            User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(User.Role.ROLE_ADMIN));
+        if (!this.userRepository.existsByRoles(List.of(Role.ADMIN))) {
+            User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(Role.ADMIN));
             admin.setEnabled(true);
             this.userRepository.save(admin);
         }
@@ -146,7 +150,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean hasAdminPrivileges() {
         String username = getCurrentUsername();
-        return userRepository.findByUsername(username).getRoles().contains(User.Role.ROLE_ADMIN);
+        return userRepository.findByUsername(username).getRoles().contains(Role.ADMIN);
     }
 
     @Override
@@ -277,6 +281,15 @@ public class UserServiceImpl implements UserService {
             userRepository.deleteById(userId);
         });
         tokenRepository.deleteAllByExpiresAtBeforeAndPurpose(time, purpose);
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        final User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new UsernameNotFoundException("User not found");
+        }
+        return new org.springframework.security.core.userdetails.User(username, user.getPassword(), user.getRoles());
     }
 
 }

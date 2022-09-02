@@ -1,4 +1,4 @@
-package com.deac.features.news.model;
+package com.deac.features.news.dto;
 
 import lombok.*;
 
