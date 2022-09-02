@@ -1,10 +1,9 @@
 package com.deac.security;
 
-import com.deac.user.persistence.entity.Role;
+import com.deac.features.news.entity.Role;
 import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -47,7 +46,7 @@ public class JwtTokenProvider {
 
     public String createToken(String username, List<Role> roles, String type, Date absoluteExpirationTime) {
         Claims claims = Jwts.claims().setSubject(username);
-        claims.put("auth", roles.stream().map(role -> new SimpleGrantedAuthority(role.getAuthority())).collect(Collectors.toList()));
+        claims.put("roles", roles.stream().map(Role::getAuthority).collect(Collectors.toList()));
         claims.put("type", type);
         if (absoluteExpirationTime != null) {
             claims.put("absexp", absoluteExpirationTime);
@@ -75,6 +74,10 @@ public class JwtTokenProvider {
 
     public String getTypeFromToken(String token) {
         return (String) Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody().get("type");
+    }
+
+    public List<?> getRolesFromToken(String token) {
+        return (List<?>) Jwts.parser().setSigningKey(secretKey).parseClaimsJws(token).getBody().get("roles");
     }
 
     public Date getAbsoluteExpirationTimeFromToken(String token) {

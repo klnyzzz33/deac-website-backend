@@ -1,4 +1,4 @@
-package com.deac.user.persistence.entity;
+package com.deac.features.news.entity;
 
 import org.springframework.security.core.GrantedAuthority;
 

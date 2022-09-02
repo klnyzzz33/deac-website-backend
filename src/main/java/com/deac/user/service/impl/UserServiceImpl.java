@@ -2,8 +2,8 @@ package com.deac.user.service.impl;
 
 import com.deac.mail.EmailService;
 import com.deac.exception.MyException;
-import com.deac.user.persistence.entity.Role;
-import com.deac.user.persistence.entity.User;
+import com.deac.features.news.entity.Role;
+import com.deac.features.news.entity.User;
 import com.deac.user.persistence.repository.UserRepository;
 import com.deac.security.JwtTokenProvider;
 import com.deac.user.service.UserService;
@@ -116,15 +116,15 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     public List<String> refresh(String refreshToken) {
-        String username = getCurrentUsername();
-        validateRefreshToken(refreshToken, username);
+        String username = jwtTokenProvider.getUsernameFromToken(refreshToken);
+        validateRefreshToken(refreshToken);
         Date absoluteValidity = jwtTokenProvider.getAbsoluteExpirationTimeFromToken(refreshToken);
         String newAccessToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "access-token", null);
         String newRefreshToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "refresh-token", absoluteValidity);
         return List.of(newAccessToken, newRefreshToken);
     }
 
-    private boolean validateRefreshToken(String refreshToken, String username) {
+    private boolean validateRefreshToken(String refreshToken) {
         try {
             jwtTokenProvider.validateToken(refreshToken);
         } catch (ExpiredJwtException e) {
@@ -134,7 +134,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             signOut();
             throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
         }
-        if (!jwtTokenProvider.getUsernameFromToken(refreshToken).equals(username) || !jwtTokenProvider.getTypeFromToken(refreshToken).equals("refresh-token")) {
+        if (!jwtTokenProvider.getTypeFromToken(refreshToken).equals("refresh-token")) {
             signOut();
             throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
         }
@@ -285,7 +285,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        final User user = userRepository.findByUsername(username);
+        User user = userRepository.findByUsername(username);
         if (user == null) {
             throw new UsernameNotFoundException("User not found");
         }

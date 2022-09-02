@@ -5,7 +5,7 @@ import com.deac.user.dto.LoginDto;
 import com.deac.user.dto.RegisterDto;
 import com.deac.user.dto.ResetDto;
 import com.deac.response.ResponseMessage;
-import com.deac.user.persistence.entity.User;
+import com.deac.features.news.entity.User;
 import com.deac.user.service.UserService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +70,9 @@ public class UserController {
 
     @PostMapping("/api/user/refresh")
     public ResponseMessage refresh(HttpServletRequest request, HttpServletResponse response) {
+        if (request.getCookies() == null) {
+            throw new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED);
+        }
         Optional<String> refreshCookie = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("refresh-token")).map(Cookie::getValue).findFirst();
         try {
             if (refreshCookie.isEmpty()) {
