@@ -2,8 +2,8 @@ package com.deac.user.service.impl;
 
 import com.deac.mail.EmailService;
 import com.deac.exception.MyException;
-import com.deac.features.news.entity.Role;
-import com.deac.features.news.entity.User;
+import com.deac.user.persistence.entity.Role;
+import com.deac.user.persistence.entity.User;
 import com.deac.user.persistence.repository.UserRepository;
 import com.deac.security.JwtTokenProvider;
 import com.deac.user.service.UserService;

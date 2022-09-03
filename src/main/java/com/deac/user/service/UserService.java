@@ -1,6 +1,6 @@
 package com.deac.user.service;
 
-import com.deac.features.news.entity.User;
+import com.deac.user.persistence.entity.User;
 
 import javax.mail.MessagingException;
 import java.util.List;

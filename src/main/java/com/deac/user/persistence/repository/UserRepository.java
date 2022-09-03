@@ -1,10 +1,10 @@
 package com.deac.user.persistence.repository;
 
-import com.deac.features.news.entity.Role;
+import com.deac.user.persistence.entity.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import com.deac.features.news.entity.User;
+import com.deac.user.persistence.entity.User;
 
 import java.util.List;
 

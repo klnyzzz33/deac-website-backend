@@ -5,7 +5,7 @@ import com.deac.user.dto.LoginDto;
 import com.deac.user.dto.RegisterDto;
 import com.deac.user.dto.ResetDto;
 import com.deac.response.ResponseMessage;
-import com.deac.features.news.entity.User;
+import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;

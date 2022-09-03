@@ -1,6 +1,6 @@
 package com.deac.security;
 
-import com.deac.features.news.entity.Role;
+import com.deac.user.persistence.entity.Role;
 import io.jsonwebtoken.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;

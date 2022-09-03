@@ -1,6 +1,6 @@
 package com.deac.user.dto;
 
-import com.deac.features.news.entity.Role;
+import com.deac.user.persistence.entity.Role;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
