@@ -36,10 +36,7 @@ public class NewsServiceImpl implements NewsService {
     @Override
     public Integer createNews(String title, String description, String content) {
         try {
-            if (!userService.hasAdminPrivileges()) {
-                throw new MyException("Could not create news, you don't have admin privileges", HttpStatus.UNAUTHORIZED);
-            }
-            News news = new News(title, description, content, userService.getCurrentUserId(userService.getCurrentUsername()), new Date());
+            News news = new News(title, description, content, userService.getCurrentUserId(), new Date());
             newsRepository.save(news);
             return news.getId();
         } catch (DataAccessException e) {
@@ -50,9 +47,6 @@ public class NewsServiceImpl implements NewsService {
     @Override
     public String deleteNews(Integer newsId) {
         try {
-            if (!userService.hasAdminPrivileges()) {
-                throw new MyException("Could not create news, you don't have admin privileges", HttpStatus.UNAUTHORIZED);
-            }
             if (!newsRepository.existsById(newsId)) {
                 throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
             }
@@ -66,9 +60,6 @@ public class NewsServiceImpl implements NewsService {
     @Override
     public String updateNews(ModifyDto modifyDto) {
         try {
-            if (!userService.hasAdminPrivileges()) {
-                throw new MyException("Could not create news, you don't have admin privileges", HttpStatus.UNAUTHORIZED);
-            }
             Optional<News> newsOptional = newsRepository.findById(modifyDto.getNewsId());
             if (newsOptional.isEmpty()) {
                 throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
@@ -77,7 +68,7 @@ public class NewsServiceImpl implements NewsService {
             news.setTitle(modifyDto.getTitle());
             news.setDescription(modifyDto.getDescription());
             news.setContent(modifyDto.getContent());
-            ModifyEntry modifyEntry = new ModifyEntry(new Date(), userService.getCurrentUserId(userService.getCurrentUsername()));
+            ModifyEntry modifyEntry = new ModifyEntry(new Date(), userService.getCurrentUserId());
             news.getModifyEntries().add(modifyEntry);
             newsRepository.save(news);
             return "Successfully updated news";

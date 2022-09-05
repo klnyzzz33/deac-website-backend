@@ -10,15 +10,17 @@ import com.deac.user.service.UserService;
 import com.deac.user.token.entity.Token;
 import com.deac.user.token.entity.TokenKey;
 import com.deac.user.token.repository.TokenRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -33,6 +35,7 @@ import org.springframework.stereotype.Service;
 import javax.mail.MessagingException;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -50,19 +53,23 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     private final EmailService emailService;
 
+    private final ObjectMapper objectMapper;
+
     @Autowired
     public UserServiceImpl(UserRepository userRepository,
                            TokenRepository tokenRepository,
                            PasswordEncoder passwordEncoder,
                            AuthenticationManager authenticationManager,
                            JwtTokenProvider jwtTokenProvider,
-                           EmailService emailService) {
+                           EmailService emailService,
+                           ObjectMapper objectMapper) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtTokenProvider = jwtTokenProvider;
         this.emailService = emailService;
+        this.objectMapper = objectMapper;
         if (!this.userRepository.existsByRoles(List.of(Role.ADMIN))) {
             User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(Role.ADMIN));
             admin.setEnabled(true);
@@ -71,21 +78,22 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
-    public List<String> signIn(String username, String password) {
+    public Map<String, String> signIn(String username, String password) {
         try {
-            Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
-            SecurityContextHolder.getContext().setAuthentication(authentication);
             User user = userRepository.findByUsername(username);
             if (!user.isEnabled()) {
                 throw new MyException("Email not verified yet", HttpStatus.UNAUTHORIZED);
             }
+            List<Role> authorities = user.getRoles();
+            Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password, authorities));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
             Date absoluteValidity = new Date(new Date().getTime() + jwtTokenProvider.getRefreshTokenAbsoluteValidityInMilliseconds());
             String accessToken = jwtTokenProvider.createToken(username, user.getRoles(), "access-token", null);
             String refreshToken = jwtTokenProvider.createToken(username, user.getRoles(), "refresh-token", absoluteValidity);
-            return List.of(accessToken, refreshToken);
+            return Map.of("accessToken", accessToken, "refreshToken", refreshToken, "authorities", objectMapper.writeValueAsString(authorities));
         } catch (AuthenticationException e) {
             throw new MyException("Invalid credentials", HttpStatus.UNAUTHORIZED);
-        } catch (DataAccessException e) {
+        } catch (DataAccessException | JsonProcessingException e) {
             throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -115,12 +123,12 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
-    public List<String> refresh(String refreshToken) {
+    public Map<String, String> refresh(String refreshToken) {
         String username = validateRefreshToken(refreshToken);
         Date absoluteValidity = jwtTokenProvider.getAbsoluteExpirationTimeFromToken(refreshToken);
         String newAccessToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "access-token", null);
         String newRefreshToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "refresh-token", absoluteValidity);
-        return List.of(newAccessToken, newRefreshToken);
+        return Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken);
     }
 
     private String validateRefreshToken(String refreshToken) {
@@ -147,23 +155,14 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
-    public boolean hasAdminPrivileges() {
-        String username = getCurrentUsername();
-        return userRepository.findByUsername(username).getRoles().contains(Role.ADMIN);
+    public Integer getCurrentUserId() {
+        return userRepository.findByUsername(getCurrentUsername()).getId();
     }
 
     @Override
     public String getCurrentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!(authentication instanceof AnonymousAuthenticationToken)) {
-            return authentication.getName();
-        }
-        throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
-    }
-
-    @Override
-    public Integer getCurrentUserId(String username) {
-        return userRepository.findByUsername(username).getId();
+        return authentication.getName();
     }
 
     @Override

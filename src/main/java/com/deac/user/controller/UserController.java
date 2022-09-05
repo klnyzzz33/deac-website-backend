@@ -21,7 +21,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -45,12 +45,12 @@ public class UserController {
 
     @PostMapping("/api/user/login")
     public ResponseMessage login(@Valid @RequestBody LoginDto loginDto, HttpServletResponse response) {
-        List<String> tokens = userService.signIn(loginDto.getUsername(), loginDto.getPassword());
-        ResponseCookie accessCookie = setCookie("access-token", tokens.get(0), accessCookieAge, true, "/");
-        ResponseCookie refreshCookie = setCookie("refresh-token", tokens.get(1), refreshCookieAge, true, "/api/user/refresh");
+        Map<String, String> values = userService.signIn(loginDto.getUsername(), loginDto.getPassword());
+        ResponseCookie accessCookie = setCookie("access-token", values.get("accessToken"), accessCookieAge, true, "/");
+        ResponseCookie refreshCookie = setCookie("refresh-token", values.get("refreshToken"), refreshCookieAge, true, "/api/user/refresh");
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
-        return new ResponseMessage("Successfully logged in");
+        return new ResponseMessage(values.get("authorities"));
     }
 
     @PostMapping("/api/user/register")
@@ -79,12 +79,12 @@ public class UserController {
                 userService.signOut();
                 throw new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED);
             }
-            List<String> tokens = userService.refresh(refreshCookie.get());
-            ResponseCookie newAccessCookie = setCookie("access-token", tokens.get(0), accessCookieAge, true, "/");
-            ResponseCookie newRefreshCookie = setCookie("refresh-token", tokens.get(1), refreshCookieAge, true, "/api/user/refresh");
+            Map<String, String> tokens = userService.refresh(refreshCookie.get());
+            ResponseCookie newAccessCookie = setCookie("access-token", tokens.get("accessToken"), accessCookieAge, true, "/");
+            ResponseCookie newRefreshCookie = setCookie("refresh-token", tokens.get("refreshToken"), refreshCookieAge, true, "/api/user/refresh");
             response.addHeader(HttpHeaders.SET_COOKIE, newAccessCookie.toString());
             response.addHeader(HttpHeaders.SET_COOKIE, newRefreshCookie.toString());
-            return new ResponseMessage("Successfully refreshed session");
+            return new ResponseMessage("Successful refresh");
         } catch (MyException e) {
             ResponseCookie newAccessCookie = setCookie("access-token", "", 0, true, "/");
             ResponseCookie newRefreshCookie = setCookie("refresh-token", "", 0, true, "/api/user/refresh");

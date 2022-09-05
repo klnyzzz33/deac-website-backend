@@ -4,22 +4,21 @@ import com.deac.user.persistence.entity.User;
 
 import javax.mail.MessagingException;
 import java.util.List;
+import java.util.Map;
 
 public interface UserService {
 
-    List<String> signIn(String username, String password);
+    Map<String, String> signIn(String username, String password);
 
     String signUp(User user);
 
-    List<String> refresh(String refreshToken);
+    Map<String, String> refresh(String refreshToken);
 
     String signOut();
 
-    boolean hasAdminPrivileges();
+    Integer getCurrentUserId();
 
     String getCurrentUsername();
-
-    Integer getCurrentUserId(String username);
 
     String getUser(Integer userId);
 
