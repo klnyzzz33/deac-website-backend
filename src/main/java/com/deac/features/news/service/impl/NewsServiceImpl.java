@@ -11,6 +11,9 @@ import com.deac.exception.MyException;
 import com.deac.user.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -84,28 +87,53 @@ public class NewsServiceImpl implements NewsService {
     }
 
     @Override
-    public List<NewsInfoDto> listNews(long min, long max) {
+    public List<NewsInfoDto> listNews(int pageNumber, int pageSize) {
         try {
-            List<News> newsList = newsRepository.findAll();
-            List<NewsInfoDto> result = newsList
-                    .stream()
-                    .map(news -> {
-                        ModifyEntry latestModifyEntry = news.getModifyEntries().stream().max(Comparator.comparing(ModifyEntry::getModifyDate)).orElse(null);
-                        return new NewsInfoDto(news.getId(),
-                                news.getTitle(),
-                                news.getDescription(),
-                                null,
-                                userService.getUser(news.getAuthorId()),
-                                news.getCreateDate(),
-                                latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
-                    })
-                    .sorted(Comparator.comparing(NewsInfoDto::getCreateDate))
-                    .collect(Collectors.toList());
-            Collections.reverse(result);
-            return result.subList((int) min, (int) max + 1);
+            Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
+            List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
+            return newsListToNewsInfoDtoList(newsList);
         } catch (DataAccessException e) {
             throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    @Override
+    public List<NewsInfoDto> getLatestNews(int pageSize) {
+        try {
+            Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
+            List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
+            return newsListToNewsInfoDtoList(newsList);
+        } catch (DataAccessException e) {
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public List<NewsInfoDto> getLatestNewsWithExcluded(int pageSize, int excludedId) {
+        try {
+            Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
+            System.out.println(excludedId);
+            List<News> newsList = newsRepository.findByIdNot(excludedId, sortedByCreateDateDesc);
+            return newsListToNewsInfoDtoList(newsList);
+        } catch (DataAccessException e) {
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private List<NewsInfoDto> newsListToNewsInfoDtoList(List<News> newsList) {
+        return newsList
+                .stream()
+                .map(news -> {
+                    ModifyEntry latestModifyEntry = news.getModifyEntries().stream().max(Comparator.comparing(ModifyEntry::getModifyDate)).orElse(null);
+                    return new NewsInfoDto(news.getId(),
+                            news.getTitle(),
+                            news.getDescription(),
+                            null,
+                            userService.getUser(news.getAuthorId()),
+                            news.getCreateDate(),
+                            latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
+                })
+                .collect(Collectors.toList());
     }
 
     @Override

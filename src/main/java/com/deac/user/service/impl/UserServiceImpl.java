@@ -116,15 +116,14 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     @Override
     public List<String> refresh(String refreshToken) {
-        String username = jwtTokenProvider.getUsernameFromToken(refreshToken);
-        validateRefreshToken(refreshToken);
+        String username = validateRefreshToken(refreshToken);
         Date absoluteValidity = jwtTokenProvider.getAbsoluteExpirationTimeFromToken(refreshToken);
         String newAccessToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "access-token", null);
         String newRefreshToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "refresh-token", absoluteValidity);
         return List.of(newAccessToken, newRefreshToken);
     }
 
-    private boolean validateRefreshToken(String refreshToken) {
+    private String validateRefreshToken(String refreshToken) {
         try {
             jwtTokenProvider.validateToken(refreshToken);
         } catch (ExpiredJwtException e) {
@@ -138,7 +137,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             signOut();
             throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
         }
-        return true;
+        return jwtTokenProvider.getUsernameFromToken(refreshToken);
     }
 
     @Override

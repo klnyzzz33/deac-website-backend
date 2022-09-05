@@ -13,7 +13,11 @@ public interface NewsService {
 
     String updateNews(ModifyDto modifyDto);
 
-    List<NewsInfoDto> listNews(long min, long max);
+    List<NewsInfoDto> listNews(int pageNumber, int pageSize);
+
+    List<NewsInfoDto> getLatestNews(int pageSize);
+
+    List<NewsInfoDto> getLatestNewsWithExcluded(int pageSize, int excludedId);
 
     long getNumberOfNews();
 

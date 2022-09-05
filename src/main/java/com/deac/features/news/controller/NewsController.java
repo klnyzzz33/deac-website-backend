@@ -44,15 +44,20 @@ public class NewsController {
     }
 
     @GetMapping("/api/news/list")
-    public List<NewsInfoDto> listNews(@RequestParam(name = "pageNumber") long pageNumber,
-                                      @RequestParam(name = "entriesPerPage") long entriesPerPage) {
-        long maxIndex = newsService.getNumberOfNews() - 1;
-        long min = entriesPerPage * (pageNumber - 1);
-        if (min > maxIndex) {
-            return List.of();
-        }
-        long max = Math.min(entriesPerPage * (pageNumber - 1) + entriesPerPage - 1, maxIndex);
-        return newsService.listNews(min, max);
+    public List<NewsInfoDto> listNews(@RequestParam(name = "pageNumber") int pageNumber,
+                                      @RequestParam(name = "entriesPerPage") int entriesPerPage) {
+        return newsService.listNews(pageNumber, entriesPerPage);
+    }
+
+    @GetMapping("/api/news/latest")
+    public List<NewsInfoDto> listLatestNews(@RequestParam(name = "entriesPerPage") int entriesPerPage) {
+        return newsService.getLatestNews(entriesPerPage);
+    }
+
+    @GetMapping("/api/news/latest_excluded")
+    public List<NewsInfoDto> listLatestNewsWithExcluded(@RequestParam(name = "entriesPerPage") int entriesPerPage,
+                                                        @RequestParam(name = "excludedId") int excludedId) {
+        return newsService.getLatestNewsWithExcluded(entriesPerPage, excludedId);
     }
 
     @GetMapping("/api/news/count")

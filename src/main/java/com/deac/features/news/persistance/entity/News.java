@@ -11,6 +11,7 @@ import java.util.List;
 @Entity
 @Getter
 @Setter
+@ToString
 @NoArgsConstructor
 public class News {
 
@@ -36,6 +37,7 @@ public class News {
     private Date createDate;
 
     @OneToMany(cascade = CascadeType.ALL)
+    @ToString.Exclude
     private List<ModifyEntry> modifyEntries;
 
     public News(String title, String description, String content, Integer authorId, Date createDate) {
