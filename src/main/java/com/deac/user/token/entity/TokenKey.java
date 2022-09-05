@@ -4,6 +4,7 @@ import lombok.*;
 
 import javax.persistence.*;
 import java.io.Serializable;
+import java.util.Objects;
 
 @Embeddable
 @Getter
@@ -18,5 +19,18 @@ public class TokenKey implements Serializable {
 
     @Column(length = 128, nullable = false, unique = true)
     private String token;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        TokenKey tokenKey = (TokenKey) o;
+        return userId.equals(tokenKey.userId) && token.equals(tokenKey.token);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(userId, token);
+    }
 
 }

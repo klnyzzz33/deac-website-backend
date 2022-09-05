@@ -112,7 +112,6 @@ public class NewsServiceImpl implements NewsService {
     public List<NewsInfoDto> getLatestNewsWithExcluded(int pageSize, int excludedId) {
         try {
             Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
-            System.out.println(excludedId);
             List<News> newsList = newsRepository.findByIdNot(excludedId, sortedByCreateDateDesc);
             return newsListToNewsInfoDtoList(newsList);
         } catch (DataAccessException e) {

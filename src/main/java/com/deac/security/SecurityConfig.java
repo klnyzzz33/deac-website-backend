@@ -45,7 +45,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         http.authorizeRequests()
                 .antMatchers("/api/**").permitAll()
                 .anyRequest().authenticated();
-        http.apply(new JwtTokenFilterConfigurer(jwtTokenProvider, objectMapper));
+        http.apply(new FilterConfigurer(jwtTokenProvider, objectMapper));
         http.cors().configurationSource(corsConfigurationSource());
     }
 

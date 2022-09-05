@@ -8,21 +8,23 @@ import org.springframework.security.web.access.intercept.FilterSecurityIntercept
 import org.springframework.stereotype.Component;
 
 @Component
-public class JwtTokenFilterConfigurer extends SecurityConfigurerAdapter<DefaultSecurityFilterChain, HttpSecurity> {
+public class FilterConfigurer extends SecurityConfigurerAdapter<DefaultSecurityFilterChain, HttpSecurity> {
 
     private final JwtTokenProvider jwtTokenProvider;
 
     private final ObjectMapper objectMapper;
 
-    public JwtTokenFilterConfigurer(JwtTokenProvider jwtTokenProvider, ObjectMapper objectMapper) {
+    public FilterConfigurer(JwtTokenProvider jwtTokenProvider, ObjectMapper objectMapper) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public void configure(HttpSecurity http) {
-        JwtTokenFilter customFilter = new JwtTokenFilter(jwtTokenProvider, objectMapper);
-        http.addFilterBefore(customFilter, FilterSecurityInterceptor.class);
+        PrivilegesFilter privilegesFilter =  new PrivilegesFilter(objectMapper);
+        JwtTokenFilter jwtTokenFilter = new JwtTokenFilter(jwtTokenProvider, objectMapper);
+        http.addFilterBefore(privilegesFilter, FilterSecurityInterceptor.class);
+        http.addFilterBefore(jwtTokenFilter, PrivilegesFilter.class);
     }
 
 }

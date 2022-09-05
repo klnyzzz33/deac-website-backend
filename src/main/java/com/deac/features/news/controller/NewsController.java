@@ -1,21 +1,15 @@
 package com.deac.features.news.controller;
 
-import com.deac.exception.MyException;
 import com.deac.features.news.dto.ModifyDto;
 import com.deac.features.news.dto.NewsDto;
 import com.deac.features.news.dto.NewsInfoDto;
 import com.deac.features.news.service.NewsService;
 import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 public class NewsController {
@@ -27,18 +21,18 @@ public class NewsController {
         this.newsService = newsService;
     }
 
-    @PostMapping("/api/news/create")
+    @PostMapping("/api/admin/news/create")
     public ResponseMessage createNews(@Valid @RequestBody NewsDto newsDto) {
         Integer newsId = newsService.createNews(newsDto.getTitle(), newsDto.getDescription(), newsDto.getContent());
         return new ResponseMessage(newsId.toString());
     }
 
-    @PostMapping("/api/news/delete")
+    @PostMapping("/api/admin/news/delete")
     public ResponseMessage deleteNews(@RequestBody Integer newsId) {
         return new ResponseMessage(newsService.deleteNews(newsId));
     }
 
-    @PostMapping("/api/news/update")
+    @PostMapping("/api/admin/news/update")
     public ResponseMessage updateNews(@RequestBody ModifyDto modifyDto) {
         return new ResponseMessage(newsService.updateNews(modifyDto));
     }
