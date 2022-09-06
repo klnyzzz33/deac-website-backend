@@ -10,15 +10,16 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TokenRepository extends JpaRepository<Token, TokenKey> {
 
     @Query(value = "SELECT t FROM Token t WHERE t.tokenId.token = :token")
-    Token findByToken(@Param("token") String token);
+    Optional<Token> findByToken(@Param("token") String token);
 
-    @Query(value = "SELECT count(t)>0 FROM Token t WHERE t.tokenId.token = :token")
-    boolean existsByToken(@Param("token") String token);
+    @Query(value = "SELECT count(t)>0 FROM Token t WHERE t.tokenId.userId = :userId")
+    boolean existsByUserId(Integer userId);
 
     @Modifying
     @Transactional

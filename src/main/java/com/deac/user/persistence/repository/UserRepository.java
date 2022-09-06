@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import com.deac.user.persistence.entity.User;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
@@ -17,7 +18,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     User findByUsername(String username);
 
-    User findByEmail(String email);
+    Optional<User> findByEmail(String email);
 
     boolean existsByRoles(@Param("roles") List<Role> roles);
 

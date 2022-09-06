@@ -106,7 +106,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             }
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             userRepository.save(user);
-            String verifyToken = RandomStringUtils.randomAlphanumeric(64);
+            String verifyToken = RandomStringUtils.randomAlphanumeric(64, 96);
             String verifyTokenHash = DigestUtils.sha256Hex(verifyToken);
             Long expiresAt = System.currentTimeMillis() + 604800000;
             tokenRepository.save(new Token(new TokenKey(user.getId(), verifyTokenHash), expiresAt, "verify-email"));
@@ -177,17 +177,21 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     @Override
     public String recoverPassword(String email) {
         try {
-            if (!userRepository.existsByEmail(email)) {
+            Optional<User> userOptional = userRepository.findByEmail(email);
+            if (userOptional.isEmpty()) {
                 return "Recovery link sent if user exists";
             }
-            User user = userRepository.findByEmail(email);
-            String passwordToken = RandomStringUtils.randomAlphanumeric(64);
+            User user = userOptional.get();
+            if (tokenRepository.existsByUserId(user.getId())) {
+                return "Recovery link sent if user exists";
+            }
+            String passwordToken = RandomStringUtils.randomAlphanumeric(64, 96);
             String passwordTokenHash = DigestUtils.sha256Hex(passwordToken);
             Long expiresAt = System.currentTimeMillis() + 300000;
-            tokenRepository.save(new Token(new TokenKey(user.getId(), passwordTokenHash), expiresAt, "password-reset"));
             emailService.sendMessage(email,
                     "Reset your password",
                     "<h3>You've issued a request to reset your password. In order to do that, please follow this link: </h3><br>http://localhost:4200/reset?token=" + passwordToken);
+            tokenRepository.save(new Token(new TokenKey(user.getId(), passwordTokenHash), expiresAt, "password-reset"));
             return "Recovery link sent if user exists";
         } catch (MessagingException e) {
             return "Recovery link sent if user exists";
@@ -200,10 +204,11 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     public String resetPassword(String token, String password) {
         try {
             String tokenHash = DigestUtils.sha256Hex(token);
-            if (!tokenRepository.existsByToken(tokenHash)) {
+            Optional<Token> tokenOptional = tokenRepository.findByToken(tokenHash);
+            if (tokenOptional.isEmpty()) {
                 throw new MyException("Password reset failed", HttpStatus.BAD_REQUEST);
             }
-            Token passwordToken = tokenRepository.findByToken(tokenHash);
+            Token passwordToken = tokenOptional.get();
             Long expiresAt = passwordToken.getExpiresAt();
             if (System.currentTimeMillis() > expiresAt) {
                 tokenRepository.deleteByToken(tokenHash);
@@ -212,6 +217,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             Integer userId = passwordToken.getTokenId().getUserId();
             Optional<User> userOptional = userRepository.findById(userId);
             if (userOptional.isEmpty()) {
+                tokenRepository.deleteByToken(tokenHash);
                 throw new MyException("Password reset failed", HttpStatus.BAD_REQUEST);
             }
             if (!passwordToken.getPurpose().equals("password-reset")) {
@@ -236,13 +242,15 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     public String verifyEmail(String token) {
         try {
             String tokenHash = DigestUtils.sha256Hex(token);
-            if (!tokenRepository.existsByToken(tokenHash)) {
+            Optional<Token> tokenOptional = tokenRepository.findByToken(tokenHash);
+            if (tokenOptional.isEmpty()) {
                 throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
             }
-            Token verifyToken = tokenRepository.findByToken(tokenHash);
+            Token verifyToken = tokenOptional.get();
             Integer userId = verifyToken.getTokenId().getUserId();
             Optional<User> userOptional = userRepository.findById(userId);
             if (userOptional.isEmpty()) {
+                tokenRepository.deleteByToken(tokenHash);
                 throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
             }
             if (!verifyToken.getPurpose().equals("verify-email")) {
@@ -264,7 +272,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         }
     }
 
-    @Scheduled(fixedDelay = 300000)
+    @Scheduled(fixedDelay = 86400000)
     public void deleteExpiredPasswordTokens() {
         tokenRepository.deleteAllByExpiresAtBeforeAndPurpose(System.currentTimeMillis(), "password-reset");
     }
