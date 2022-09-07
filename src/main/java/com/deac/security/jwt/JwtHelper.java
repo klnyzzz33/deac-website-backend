@@ -108,7 +108,7 @@ public class JwtHelper {
 
     public void removeCookies(HttpServletResponse response) {
         ResponseCookie accessCookie = setCookie("access-token", "", 0, true, "/");
-        ResponseCookie refreshCookie = setCookie("refresh-token", "", 0, true, "/api/user/refresh");
+        ResponseCookie refreshCookie = setCookie("refresh-token", "", 0, true, "/api/user/auth/refresh");
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
     }
