@@ -33,7 +33,7 @@ public class NewsController {
     }
 
     @PostMapping("/api/admin/news/update")
-    public ResponseMessage updateNews(@RequestBody ModifyDto modifyDto) {
+    public ResponseMessage updateNews(@Valid @RequestBody ModifyDto modifyDto) {
         return new ResponseMessage(newsService.updateNews(modifyDto));
     }
 

@@ -1,12 +1,10 @@
-package com.deac.security;
+package com.deac.security.jwt.accesstoken;
 
 import com.deac.exception.MyException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -18,26 +16,27 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
-public class JwtTokenFilter extends OncePerRequestFilter {
+public class AccessTokenFilter extends OncePerRequestFilter {
 
-    private static final String[] excludedEndPoints = new String[]{"/api/user/login",
+    private static final String[] excludedEndPoints = new String[]{"/api/user/auth/login",
             "/api/user/register",
             "/api/user/forgot",
             "/api/user/reset",
             "/api/user/verify",
-            "/api/user/refresh"};
+            "/api/user/auth/refresh"};
 
-    private final JwtTokenProvider jwtTokenProvider;
+    private final AccessTokenProvider accessTokenProvider;
 
     private final ObjectMapper objectMapper;
 
-    public JwtTokenFilter(JwtTokenProvider jwtTokenProvider, ObjectMapper objectMapper) {
-        this.jwtTokenProvider = jwtTokenProvider;
+    private final AntPathMatcher antPathMatcher;
+
+    public AccessTokenFilter(AccessTokenProvider accessTokenProvider, ObjectMapper objectMapper, AntPathMatcher antPathMatcher) {
+        this.accessTokenProvider = accessTokenProvider;
         this.objectMapper = objectMapper;
+        this.antPathMatcher = antPathMatcher;
     }
 
     @Override
@@ -52,12 +51,9 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             }
             try {
                 String accessToken = accessCookie.get();
-                jwtTokenProvider.validateToken(accessToken);
-                String username = jwtTokenProvider.getUsernameFromToken(accessToken);
-                List<SimpleGrantedAuthority> roles = jwtTokenProvider.getRolesFromToken(accessToken)
-                        .stream().map(role -> new SimpleGrantedAuthority(role.toString())).collect(Collectors.toList());
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(username, null, roles);
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                accessTokenProvider.validateToken(accessToken);
+                accessTokenProvider.authorize(accessToken);
+                filterChain.doFilter(httpServletRequest, httpServletResponse);
             } catch (ExpiredJwtException e) {
                 SecurityContextHolder.clearContext();
                 throw new MyException("Expired access token", HttpStatus.UNAUTHORIZED);
@@ -65,12 +61,8 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                 SecurityContextHolder.clearContext();
                 throw new MyException("Invalid access token", HttpStatus.UNAUTHORIZED);
             }
-            if (!jwtTokenProvider.getTypeFromToken(accessCookie.get()).equals("access-token")) {
-                SecurityContextHolder.clearContext();
-                throw new MyException("Invalid access token", HttpStatus.UNAUTHORIZED);
-            }
-            filterChain.doFilter(httpServletRequest, httpServletResponse);
         } catch (MyException e) {
+            SecurityContextHolder.clearContext();
             httpServletResponse.setStatus(e.getHttpStatus().value());
             httpServletResponse.getWriter().write(objectMapper.writeValueAsString(e.getMessage()));
         }
@@ -78,7 +70,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return Arrays.stream(excludedEndPoints).anyMatch(e -> new AntPathMatcher().match(e, request.getRequestURI()));
+        return Arrays.stream(excludedEndPoints).anyMatch(e -> antPathMatcher.match(e, request.getRequestURI()));
     }
 
 }

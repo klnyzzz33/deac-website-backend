@@ -29,17 +29,17 @@ public class User {
     private String password;
 
     @ElementCollection(fetch = FetchType.EAGER)
-    List<Role> roles;
+    private List<Role> roles;
 
     @Column(nullable = false)
-    boolean isEnabled;
+    private boolean isVerified;
 
     public User(String username, String email, String password, List<Role> roles) {
         this.username = username;
         this.email = email;
         this.password = password;
         this.roles = roles;
-        this.isEnabled = false;
+        this.isVerified = false;
     }
 
 }

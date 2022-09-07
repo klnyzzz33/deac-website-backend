@@ -35,79 +35,56 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     public Integer createNews(String title, String description, String content) {
-        try {
-            News news = new News(title, description, content, userService.getCurrentUserId(), new Date());
-            newsRepository.save(news);
-            return news.getId();
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        News news = new News(title, description, content, userService.getCurrentUserId(), new Date());
+        newsRepository.save(news);
+        return news.getId();
     }
 
     @Override
     public String deleteNews(Integer newsId) {
-        try {
-            if (!newsRepository.existsById(newsId)) {
-                throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
-            }
-            newsRepository.deleteById(newsId);
-            return "Successfully deleted news";
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        if (!newsRepository.existsById(newsId)) {
+            throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
         }
+        newsRepository.deleteById(newsId);
+        return "Successfully deleted news";
     }
 
     @Override
     public String updateNews(ModifyDto modifyDto) {
-        try {
-            Optional<News> newsOptional = newsRepository.findById(modifyDto.getNewsId());
-            if (newsOptional.isEmpty()) {
-                throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
-            }
-            News news = newsOptional.get();
-            news.setTitle(modifyDto.getTitle());
-            news.setDescription(modifyDto.getDescription());
-            news.setContent(modifyDto.getContent());
-            ModifyEntry modifyEntry = new ModifyEntry(new Date(), userService.getCurrentUserId());
-            news.getModifyEntries().add(modifyEntry);
-            newsRepository.save(news);
-            return "Successfully updated news";
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        Optional<News> newsOptional = newsRepository.findById(modifyDto.getNewsId());
+        if (newsOptional.isEmpty()) {
+            throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
         }
+        News news = newsOptional.get();
+        news.setTitle(modifyDto.getTitle());
+        news.setDescription(modifyDto.getDescription());
+        news.setContent(modifyDto.getContent());
+        ModifyEntry modifyEntry = new ModifyEntry(new Date(), userService.getCurrentUserId());
+        news.getModifyEntries().add(modifyEntry);
+        newsRepository.save(news);
+        return "Successfully updated news";
     }
 
     @Override
     public List<NewsInfoDto> listNews(int pageNumber, int pageSize) {
-        try {
-            Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
-            List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
-            return newsListToNewsInfoDtoList(newsList);
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
+        List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
+        return newsListToNewsInfoDtoList(newsList);
     }
 
     @Override
     public List<NewsInfoDto> getLatestNews(int pageSize) {
-        try {
-            Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
-            List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
-            return newsListToNewsInfoDtoList(newsList);
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
+        List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
+        return newsListToNewsInfoDtoList(newsList);
     }
 
     @Override
     public List<NewsInfoDto> getLatestNewsWithExcluded(int pageSize, int excludedId) {
-        try {
-            Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
-            List<News> newsList = newsRepository.findByIdNot(excludedId, sortedByCreateDateDesc);
-            return newsListToNewsInfoDtoList(newsList);
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
+        List<News> newsList = newsRepository.findByIdNot(excludedId, sortedByCreateDateDesc);
+        return newsListToNewsInfoDtoList(newsList);
+
     }
 
     private List<NewsInfoDto> newsListToNewsInfoDtoList(List<News> newsList) {
@@ -128,31 +105,23 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     public long getNumberOfNews() {
-        try {
-            return newsRepository.count();
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return newsRepository.count();
     }
 
     public NewsInfoDto getSingleNews(Integer id) {
-        try {
-            Optional<News> newsOptional = newsRepository.findById(id);
-            if (newsOptional.isEmpty()) {
-                throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
-            }
-            News news = newsOptional.get();
-            ModifyEntry latestModifyEntry = news.getModifyEntries().stream().max(Comparator.comparing(ModifyEntry::getModifyDate)).orElse(null);
-            return new NewsInfoDto(news.getId(),
-                    news.getTitle(),
-                    news.getDescription(),
-                    news.getContent(),
-                    userService.getUser(news.getAuthorId()),
-                    news.getCreateDate(),
-                    latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        Optional<News> newsOptional = newsRepository.findById(id);
+        if (newsOptional.isEmpty()) {
+            throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
         }
+        News news = newsOptional.get();
+        ModifyEntry latestModifyEntry = news.getModifyEntries().stream().max(Comparator.comparing(ModifyEntry::getModifyDate)).orElse(null);
+        return new NewsInfoDto(news.getId(),
+                news.getTitle(),
+                news.getDescription(),
+                news.getContent(),
+                userService.getUser(news.getAuthorId()),
+                news.getCreateDate(),
+                latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
     }
 
 }

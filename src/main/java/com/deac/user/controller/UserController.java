@@ -22,7 +22,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import java.util.Arrays;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 public class UserController {
@@ -43,11 +42,16 @@ public class UserController {
         this.modelMapper = modelMapper;
     }
 
-    @PostMapping("/api/user/login")
-    public ResponseMessage login(@Valid @RequestBody LoginDto loginDto, HttpServletResponse response) {
-        Map<String, String> values = userService.signIn(loginDto.getUsername(), loginDto.getPassword());
-        ResponseCookie accessCookie = setCookie("access-token", values.get("accessToken"), accessCookieAge, true, "/");
-        ResponseCookie refreshCookie = setCookie("refresh-token", values.get("refreshToken"), refreshCookieAge, true, "/api/user/refresh");
+    @PostMapping("/api/user/auth/login")
+    public ResponseMessage login(@Valid @RequestBody LoginDto loginDto, HttpServletRequest request, HttpServletResponse response) {
+        String refreshToken = request.getCookies() != null ? Arrays.stream(request.getCookies())
+                .filter(cookie -> cookie.getName().equals("refresh-token"))
+                .map(Cookie::getValue)
+                .findFirst()
+                .orElse("") : "";
+        Map<String, String> values = userService.signIn(loginDto.getUsername(), loginDto.getPassword(), refreshToken);
+        ResponseCookie accessCookie = userService.setCookie("access-token", values.get("accessToken"), accessCookieAge, true, "/");
+        ResponseCookie refreshCookie = userService.setCookie("refresh-token", values.get("refreshToken"), refreshCookieAge, true, "/api/user/auth");
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
         return new ResponseMessage(values.get("authorities"));
@@ -68,51 +72,36 @@ public class UserController {
         return new ResponseMessage(userService.getCurrentUsername());
     }
 
-    @PostMapping("/api/user/refresh")
+    @PostMapping("/api/user/auth/refresh")
     public ResponseMessage refresh(HttpServletRequest request, HttpServletResponse response) {
-        if (request.getCookies() == null) {
-            throw new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED);
-        }
-        Optional<String> refreshCookie = Arrays.stream(request.getCookies()).filter(cookie -> cookie.getName().equals("refresh-token")).map(Cookie::getValue).findFirst();
         try {
-            if (refreshCookie.isEmpty()) {
-                userService.signOut();
-                throw new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED);
-            }
-            Map<String, String> tokens = userService.refresh(refreshCookie.get());
-            ResponseCookie newAccessCookie = setCookie("access-token", tokens.get("accessToken"), accessCookieAge, true, "/");
-            ResponseCookie newRefreshCookie = setCookie("refresh-token", tokens.get("refreshToken"), refreshCookieAge, true, "/api/user/refresh");
+            String refreshToken = Arrays.stream(request.getCookies())
+                    .filter(cookie -> cookie.getName().equals("refresh-token"))
+                    .map(Cookie::getValue)
+                    .findFirst()
+                    .orElseThrow(() -> new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED));
+            Map<String, String> tokens = userService.refresh(refreshToken);
+            ResponseCookie newAccessCookie = userService.setCookie("access-token", tokens.get("accessToken"), accessCookieAge, true, "/");
+            ResponseCookie newRefreshCookie = userService.setCookie("refresh-token", tokens.get("refreshToken"), refreshCookieAge, true, "/api/user/auth");
             response.addHeader(HttpHeaders.SET_COOKIE, newAccessCookie.toString());
             response.addHeader(HttpHeaders.SET_COOKIE, newRefreshCookie.toString());
             return new ResponseMessage("Successful refresh");
         } catch (MyException e) {
-            ResponseCookie newAccessCookie = setCookie("access-token", "", 0, true, "/");
-            ResponseCookie newRefreshCookie = setCookie("refresh-token", "", 0, true, "/api/user/refresh");
-            response.addHeader(HttpHeaders.SET_COOKIE, newAccessCookie.toString());
-            response.addHeader(HttpHeaders.SET_COOKIE, newRefreshCookie.toString());
+            userService.removeCookies(response);
             throw e;
         }
     }
 
     @GetMapping("/api/user/logout")
     public ResponseMessage logout(HttpServletResponse response) {
-        String responseString = userService.signOut();
-        ResponseCookie accessCookie = setCookie("access-token", "", 0, true, "/");
-        ResponseCookie refreshCookie = setCookie("refresh-token", "", 0, true, "/api/user/refresh");
-        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
-        return new ResponseMessage(responseString);
-    }
-
-    private ResponseCookie setCookie(String name, String value, long age, boolean httpOnly, String path) {
-        return ResponseCookie
-                .from(name, value)
-                .maxAge(age)
-                .httpOnly(httpOnly)
-                .sameSite("Strict")
-                .secure(false)
-                .path(path)
-                .build();
+        try {
+            String responseString = userService.signOut();
+            userService.removeCookies(response);
+            return new ResponseMessage(responseString);
+        } catch (MyException e) {
+            userService.removeCookies(response);
+            throw e;
+        }
     }
 
     @PostMapping("/api/user/forgot")

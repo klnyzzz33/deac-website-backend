@@ -22,8 +22,11 @@ public class PrivilegesFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper;
 
-    public PrivilegesFilter(ObjectMapper objectMapper) {
+    private final AntPathMatcher antPathMatcher;
+
+    public PrivilegesFilter(ObjectMapper objectMapper, AntPathMatcher antPathMatcher) {
         this.objectMapper = objectMapper;
+        this.antPathMatcher = antPathMatcher;
     }
 
     @Override
@@ -46,8 +49,8 @@ public class PrivilegesFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !new AntPathMatcher().match(filteredEndPoint, request.getRequestURI());
+    protected boolean shouldNotFilter(HttpServletRequest httpServletRequest) {
+        return !antPathMatcher.match(filteredEndPoint, httpServletRequest.getRequestURI());
     }
 
 }

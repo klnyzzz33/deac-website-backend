@@ -2,29 +2,29 @@ package com.deac.user.service.impl;
 
 import com.deac.mail.EmailService;
 import com.deac.exception.MyException;
+import com.deac.security.jwt.refreshtoken.RefreshTokenProvider;
 import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.persistence.repository.UserRepository;
-import com.deac.security.JwtTokenProvider;
+import com.deac.security.jwt.accesstoken.AccessTokenProvider;
 import com.deac.user.service.UserService;
 import com.deac.user.token.entity.Token;
 import com.deac.user.token.entity.TokenKey;
 import com.deac.user.token.repository.TokenRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -33,67 +33,82 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.mail.MessagingException;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import javax.servlet.http.HttpServletResponse;
+import java.util.*;
 
 @Service
 public class UserServiceImpl implements UserService, UserDetailsService {
+
+    private final AuthenticationManager authenticationManager;
+
+    private final PasswordEncoder passwordEncoder;
+
+    private final ObjectMapper objectMapper;
 
     private final UserRepository userRepository;
 
     private final TokenRepository tokenRepository;
 
-    private final PasswordEncoder passwordEncoder;
+    private final AccessTokenProvider accessTokenProvider;
 
-    private final AuthenticationManager authenticationManager;
-
-    private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenProvider refreshTokenProvider;
 
     private final EmailService emailService;
 
-    private final ObjectMapper objectMapper;
-
     @Autowired
-    public UserServiceImpl(UserRepository userRepository,
-                           TokenRepository tokenRepository,
+    public UserServiceImpl(AuthenticationManager authenticationManager,
                            PasswordEncoder passwordEncoder,
-                           AuthenticationManager authenticationManager,
-                           JwtTokenProvider jwtTokenProvider,
-                           EmailService emailService,
-                           ObjectMapper objectMapper) {
+                           ObjectMapper objectMapper,
+                           UserRepository userRepository,
+                           TokenRepository tokenRepository,
+                           AccessTokenProvider accessTokenProvider,
+                           RefreshTokenProvider refreshTokenProvider,
+                           EmailService emailService) {
+        this.authenticationManager = authenticationManager;
+        this.passwordEncoder = passwordEncoder;
+        this.objectMapper = objectMapper;
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.authenticationManager = authenticationManager;
-        this.jwtTokenProvider = jwtTokenProvider;
+        this.accessTokenProvider = accessTokenProvider;
+        this.refreshTokenProvider = refreshTokenProvider;
         this.emailService = emailService;
-        this.objectMapper = objectMapper;
         if (!this.userRepository.existsByRoles(List.of(Role.ADMIN))) {
             User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(Role.ADMIN));
-            admin.setEnabled(true);
+            admin.setVerified(true);
             this.userRepository.save(admin);
         }
     }
 
     @Override
-    public Map<String, String> signIn(String username, String password) {
+    public UserDetails loadUserByUsername(String username) {
+        Optional<User> userOptional = userRepository.findByUsername(username);
+        if (userOptional.isEmpty()) {
+            throw new UsernameNotFoundException("User does not exist");
+        }
+        User user = userOptional.get();
+        if (!user.isVerified()) {
+            throw new MyException("Email not verified yet", HttpStatus.UNAUTHORIZED);
+        }
+        return new org.springframework.security.core.userdetails.User(username, user.getPassword(), user.getRoles());
+    }
+
+    @Override
+    public Map<String, String> signIn(String username, String password, String token) {
         try {
-            User user = userRepository.findByUsername(username);
-            if (!user.isEnabled()) {
-                throw new MyException("Email not verified yet", HttpStatus.UNAUTHORIZED);
-            }
-            List<Role> authorities = user.getRoles();
-            Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password, authorities));
+            Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            Date absoluteValidity = new Date(new Date().getTime() + jwtTokenProvider.getRefreshTokenAbsoluteValidityInMilliseconds());
-            String accessToken = jwtTokenProvider.createToken(username, user.getRoles(), "access-token", null);
-            String refreshToken = jwtTokenProvider.createToken(username, user.getRoles(), "refresh-token", absoluteValidity);
-            return Map.of("accessToken", accessToken, "refreshToken", refreshToken, "authorities", objectMapper.writeValueAsString(authorities));
+            Collection<? extends GrantedAuthority> roles = authentication.getAuthorities();
+            Date now = new Date();
+            Date absoluteValidity = new Date(now.getTime() + refreshTokenProvider.getRefreshTokenAbsoluteValidityInMilliseconds());
+            long loginIdentifier = now.getTime();
+            String accessToken = accessTokenProvider.createToken(username, "access-token", roles);
+            String refreshToken = refreshTokenProvider.createToken(token, username, "refresh-token", roles, loginIdentifier, absoluteValidity);
+            return Map.of("accessToken", accessToken, "refreshToken", refreshToken, "authorities", objectMapper.writeValueAsString(roles));
+        } catch (AuthenticationServiceException e) {
+            throw e;
         } catch (AuthenticationException e) {
             throw new MyException("Invalid credentials", HttpStatus.UNAUTHORIZED);
-        } catch (DataAccessException | JsonProcessingException e) {
+        } catch (JsonProcessingException e) {
             throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -117,52 +132,49 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         } catch (MessagingException e) {
             userRepository.delete(user);
             throw new MyException("Could not send registration confirmation email", HttpStatus.INTERNAL_SERVER_ERROR);
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     @Override
     public Map<String, String> refresh(String refreshToken) {
-        String username = validateRefreshToken(refreshToken);
-        Date absoluteValidity = jwtTokenProvider.getAbsoluteExpirationTimeFromToken(refreshToken);
-        String newAccessToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "access-token", null);
-        String newRefreshToken = jwtTokenProvider.createToken(username, userRepository.findByUsername(username).getRoles(), "refresh-token", absoluteValidity);
-        return Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken);
-    }
-
-    private String validateRefreshToken(String refreshToken) {
         try {
-            jwtTokenProvider.validateToken(refreshToken);
-        } catch (ExpiredJwtException e) {
-            signOut();
-            throw new MyException("Expired refresh token", HttpStatus.UNAUTHORIZED);
-        } catch (JwtException | IllegalArgumentException e) {
-            signOut();
-            throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
+            String username = getCurrentUsername();
+            Collection<? extends GrantedAuthority> roles = getCurrentAuthorities();
+            Date absoluteValidity = refreshTokenProvider.getAbsoluteExpirationTimeFromToken(refreshToken);
+            long loginIdentifier = refreshTokenProvider.getLoginIdentifierFromToken(refreshToken);
+            String newAccessToken = accessTokenProvider.createToken(username, "access-token", roles);
+            String newRefreshToken = refreshTokenProvider.updateToken(refreshToken, username, "refresh-token", roles, loginIdentifier, absoluteValidity);
+            return Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken);
+        } catch (Exception e) {
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        if (!jwtTokenProvider.getTypeFromToken(refreshToken).equals("refresh-token")) {
-            signOut();
-            throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
-        }
-        return jwtTokenProvider.getUsernameFromToken(refreshToken);
     }
 
     @Override
     public String signOut() {
-        SecurityContextHolder.clearContext();
-        return "Successfully logged out";
-    }
-
-    @Override
-    public Integer getCurrentUserId() {
-        return userRepository.findByUsername(getCurrentUsername()).getId();
+        try {
+            refreshTokenProvider.invalidateUserTokens(getCurrentUsername());
+            SecurityContextHolder.clearContext();
+            return "Successfully logged out";
+        } catch (Exception e) {
+            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @Override
     public String getCurrentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();
+    }
+
+    public Collection<? extends GrantedAuthority> getCurrentAuthorities() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication.getAuthorities();
+    }
+
+    @Override
+    public Integer getCurrentUserId() {
+        return userRepository.findByUsername(getCurrentUsername()).orElseThrow(() -> new MyException("User does not exist", HttpStatus.BAD_REQUEST)).getId();
     }
 
     @Override
@@ -195,8 +207,6 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             return "Recovery link sent if user exists";
         } catch (MessagingException e) {
             return "Recovery link sent if user exists";
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -209,11 +219,6 @@ public class UserServiceImpl implements UserService, UserDetailsService {
                 throw new MyException("Password reset failed", HttpStatus.BAD_REQUEST);
             }
             Token passwordToken = tokenOptional.get();
-            Long expiresAt = passwordToken.getExpiresAt();
-            if (System.currentTimeMillis() > expiresAt) {
-                tokenRepository.deleteByToken(tokenHash);
-                throw new MyException("Reset token expired", HttpStatus.BAD_REQUEST);
-            }
             Integer userId = passwordToken.getTokenId().getUserId();
             Optional<User> userOptional = userRepository.findById(userId);
             if (userOptional.isEmpty()) {
@@ -223,9 +228,15 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             if (!passwordToken.getPurpose().equals("password-reset")) {
                 throw new MyException("Password reset failed", HttpStatus.BAD_REQUEST);
             }
+            Long expiresAt = passwordToken.getExpiresAt();
+            if (System.currentTimeMillis() > expiresAt) {
+                tokenRepository.deleteByToken(tokenHash);
+                throw new MyException("Reset token expired", HttpStatus.BAD_REQUEST);
+            }
             User user = userOptional.get();
             user.setPassword(passwordEncoder.encode(password));
             userRepository.save(user);
+            refreshTokenProvider.invalidateUserTokens(user.getUsername());
             tokenRepository.deleteAllByUserIdAndPurpose(userId, "password-reset");
             emailService.sendMessage(user.getEmail(),
                     "Your password has been changed",
@@ -233,43 +244,52 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             return "Password successfully reset";
         } catch (MessagingException e) {
             return "Recovery link sent if user exists";
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     @Override
     public String verifyEmail(String token) {
-        try {
-            String tokenHash = DigestUtils.sha256Hex(token);
-            Optional<Token> tokenOptional = tokenRepository.findByToken(tokenHash);
-            if (tokenOptional.isEmpty()) {
-                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
-            }
-            Token verifyToken = tokenOptional.get();
-            Integer userId = verifyToken.getTokenId().getUserId();
-            Optional<User> userOptional = userRepository.findById(userId);
-            if (userOptional.isEmpty()) {
-                tokenRepository.deleteByToken(tokenHash);
-                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
-            }
-            if (!verifyToken.getPurpose().equals("verify-email")) {
-                throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
-            }
-            Long expiresAt = verifyToken.getExpiresAt();
-            if (System.currentTimeMillis() > expiresAt) {
-                tokenRepository.deleteByToken(tokenHash);
-                userRepository.deleteById(userId);
-                throw new MyException("Verify token expired", HttpStatus.BAD_REQUEST);
-            }
-            User user = userOptional.get();
-            user.setEnabled(true);
-            userRepository.save(user);
-            tokenRepository.deleteAllByUserIdAndPurpose(userId, "verify-email");
-            return "Email successfully verified";
-        } catch (DataAccessException e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+        String tokenHash = DigestUtils.sha256Hex(token);
+        Optional<Token> tokenOptional = tokenRepository.findByToken(tokenHash);
+        if (tokenOptional.isEmpty()) {
+            throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
         }
+        Token verifyToken = tokenOptional.get();
+        Integer userId = verifyToken.getTokenId().getUserId();
+        Optional<User> userOptional = userRepository.findById(userId);
+        if (userOptional.isEmpty()) {
+            tokenRepository.deleteByToken(tokenHash);
+            throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
+        }
+        if (!verifyToken.getPurpose().equals("verify-email")) {
+            throw new MyException("Email verify failed", HttpStatus.BAD_REQUEST);
+        }
+        Long expiresAt = verifyToken.getExpiresAt();
+        if (System.currentTimeMillis() > expiresAt) {
+            tokenRepository.deleteByToken(tokenHash);
+            userRepository.deleteById(userId);
+            throw new MyException("Verify token expired", HttpStatus.BAD_REQUEST);
+        }
+        User user = userOptional.get();
+        user.setVerified(true);
+        userRepository.save(user);
+        tokenRepository.deleteAllByUserIdAndPurpose(userId, "verify-email");
+        return "Email successfully verified";
+    }
+
+    @Override
+    public void removeCookies(HttpServletResponse response) {
+        refreshTokenProvider.removeCookies(response);
+    }
+
+    @Override
+    public ResponseCookie setCookie(String name, String value, long age, boolean httpOnly, String path) {
+        return refreshTokenProvider.setCookie(name, value, age, httpOnly, path);
+    }
+
+    @Scheduled(fixedDelay = 86400000)
+    public void deleteExpiredRefreshTokens() {
+        refreshTokenProvider.invalidateAllExpiredTokens();
     }
 
     @Scheduled(fixedDelay = 86400000)
@@ -287,15 +307,6 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             userRepository.deleteById(userId);
         });
         tokenRepository.deleteAllByExpiresAtBeforeAndPurpose(time, purpose);
-    }
-
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username);
-        if (user == null) {
-            throw new UsernameNotFoundException("User not found");
-        }
-        return new org.springframework.security.core.userdetails.User(username, user.getPassword(), user.getRoles());
     }
 
 }

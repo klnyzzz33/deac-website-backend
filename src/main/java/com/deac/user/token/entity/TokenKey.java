@@ -25,7 +25,7 @@ public class TokenKey implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         TokenKey tokenKey = (TokenKey) o;
-        return userId.equals(tokenKey.userId) && token.equals(tokenKey.token);
+        return userId.equals(tokenKey.getUserId()) && token.equals(tokenKey.getToken());
     }
 
     @Override

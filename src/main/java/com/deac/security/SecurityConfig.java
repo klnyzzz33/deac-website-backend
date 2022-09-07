@@ -1,11 +1,11 @@
 package com.deac.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -25,14 +25,11 @@ import java.util.List;
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
-    private final JwtTokenProvider jwtTokenProvider;
-
-    private final ObjectMapper objectMapper;
+    private final FilterConfigurer filterConfigurer;
 
     @Autowired
-    public SecurityConfig(JwtTokenProvider jwtTokenProvider, ObjectMapper objectMapper) {
-        this.jwtTokenProvider = jwtTokenProvider;
-        this.objectMapper = objectMapper;
+    public SecurityConfig(FilterConfigurer filterConfigurer) {
+        this.filterConfigurer = filterConfigurer;
     }
 
     @Override
@@ -40,12 +37,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
         http.csrf().disable();
         http.headers().xssProtection().disable();
-        http.headers().addHeaderWriter(new StaticHeadersWriter("X-XSS-Protection","0"));
+        http.headers().addHeaderWriter(new StaticHeadersWriter("X-XSS-Protection", "0"));
         http.headers().contentSecurityPolicy("default-src 'self'");
         http.authorizeRequests()
                 .antMatchers("/api/**").permitAll()
                 .anyRequest().authenticated();
-        http.apply(new FilterConfigurer(jwtTokenProvider, objectMapper));
+        http.apply(filterConfigurer);
         http.cors().configurationSource(corsConfigurationSource());
     }
 
@@ -59,6 +56,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    @Autowired
+    public void configureGlobal(AuthenticationManagerBuilder auth) {
+        auth.eraseCredentials(false);
     }
 
     @Bean
