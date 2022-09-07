@@ -4,11 +4,14 @@ import com.deac.exception.MyException;
 import com.deac.security.jwt.JwtHelper;
 import com.deac.security.jwt.refreshtoken.entity.RefreshToken;
 import com.deac.security.jwt.refreshtoken.repository.RefreshTokenRepository;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletResponse;
@@ -39,13 +42,26 @@ public class RefreshTokenProvider {
 
     public String createToken(String originalToken, String username, String type, Collection<? extends GrantedAuthority> roles, long loginIdentifier, Date absoluteExpirationTime) {
         if (originalToken.isEmpty()) {
-            String token = jwtHelper.createToken(username, type, roles, loginIdentifier, absoluteExpirationTime, refreshTokenSlidingValidityInMilliseconds);
-            Long expiresAt = System.currentTimeMillis() + refreshTokenSlidingValidityInMilliseconds;
-            RefreshToken refreshToken = new RefreshToken(username, loginIdentifier, token, expiresAt);
-            refreshTokenRepository.save(refreshToken);
-            return token;
+            return createNewToken(username, type, roles, loginIdentifier, absoluteExpirationTime);
         } else {
+            return replaceExistingToken(originalToken, username, type, roles, loginIdentifier, absoluteExpirationTime);
+        }
+    }
+
+    private String createNewToken(String username, String type, Collection<? extends GrantedAuthority> roles, long loginIdentifier, Date absoluteExpirationTime) {
+        String token = jwtHelper.createToken(username, type, roles, loginIdentifier, absoluteExpirationTime, refreshTokenSlidingValidityInMilliseconds);
+        Long expiresAt = System.currentTimeMillis() + refreshTokenSlidingValidityInMilliseconds;
+        RefreshToken refreshToken = new RefreshToken(username, loginIdentifier, token, expiresAt);
+        refreshTokenRepository.save(refreshToken);
+        return token;
+    }
+
+    private String replaceExistingToken(String originalToken, String username, String type, Collection<? extends GrantedAuthority> roles, long loginIdentifier, Date absoluteExpirationTime) {
+        try {
+            validateToken(originalToken);
             return updateToken(originalToken, username, type, roles, loginIdentifier, absoluteExpirationTime);
+        } catch (JwtException | IllegalArgumentException e) {
+            return createNewToken(username, type, roles, loginIdentifier, absoluteExpirationTime);
         }
     }
 
