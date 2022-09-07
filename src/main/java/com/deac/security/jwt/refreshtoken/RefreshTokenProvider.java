@@ -41,28 +41,14 @@ public class RefreshTokenProvider {
     }
 
     public String createToken(String originalToken, String username, String type, Collection<? extends GrantedAuthority> roles, long loginIdentifier, Date absoluteExpirationTime) {
-        if (originalToken.isEmpty()) {
-            return createNewToken(username, type, roles, loginIdentifier, absoluteExpirationTime);
-        } else {
-            return replaceExistingToken(originalToken, username, type, roles, loginIdentifier, absoluteExpirationTime);
+        if (!originalToken.isEmpty()) {
+            refreshTokenRepository.deleteByToken(originalToken);
         }
-    }
-
-    private String createNewToken(String username, String type, Collection<? extends GrantedAuthority> roles, long loginIdentifier, Date absoluteExpirationTime) {
         String token = jwtHelper.createToken(username, type, roles, loginIdentifier, absoluteExpirationTime, refreshTokenSlidingValidityInMilliseconds);
         Long expiresAt = System.currentTimeMillis() + refreshTokenSlidingValidityInMilliseconds;
         RefreshToken refreshToken = new RefreshToken(username, loginIdentifier, token, expiresAt);
         refreshTokenRepository.save(refreshToken);
         return token;
-    }
-
-    private String replaceExistingToken(String originalToken, String username, String type, Collection<? extends GrantedAuthority> roles, long loginIdentifier, Date absoluteExpirationTime) {
-        try {
-            validateToken(originalToken);
-            return updateToken(originalToken, username, type, roles, loginIdentifier, absoluteExpirationTime);
-        } catch (JwtException | IllegalArgumentException e) {
-            return createNewToken(username, type, roles, loginIdentifier, absoluteExpirationTime);
-        }
     }
 
     public String updateToken(String originalToken, String username, String type, Collection<? extends GrantedAuthority> roles, long loginIdentifier, Date absoluteExpirationTime) {
