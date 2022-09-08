@@ -2,9 +2,11 @@ package com.deac.user.service;
 
 import com.deac.user.persistence.entity.User;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.GrantedAuthority;
 
 import javax.mail.MessagingException;
 import javax.servlet.http.HttpServletResponse;
+import java.util.Collection;
 import java.util.Map;
 
 public interface UserService {
@@ -17,9 +19,11 @@ public interface UserService {
 
     String signOut();
 
-    Integer getCurrentUserId();
-
     String getCurrentUsername();
+
+    Collection<? extends GrantedAuthority> getCurrentAuthorities();
+
+    Integer getCurrentUserId();
 
     String getUser(Integer userId);
 

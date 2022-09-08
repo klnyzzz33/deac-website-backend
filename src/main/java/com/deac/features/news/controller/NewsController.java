@@ -32,6 +32,11 @@ public class NewsController {
         return new ResponseMessage(newsService.deleteNews(newsId));
     }
 
+    @PostMapping("/api/admin/news/delete_selected")
+    public ResponseMessage deleteSelectedNews(@RequestBody List<Integer> newsIds) {
+        return new ResponseMessage(newsService.deleteSelectedNews(newsIds));
+    }
+
     @PostMapping("/api/admin/news/update")
     public ResponseMessage updateNews(@Valid @RequestBody ModifyDto modifyDto) {
         return new ResponseMessage(newsService.updateNews(modifyDto));

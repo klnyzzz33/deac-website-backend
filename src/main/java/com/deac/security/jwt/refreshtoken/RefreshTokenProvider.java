@@ -4,14 +4,11 @@ import com.deac.exception.MyException;
 import com.deac.security.jwt.JwtHelper;
 import com.deac.security.jwt.refreshtoken.entity.RefreshToken;
 import com.deac.security.jwt.refreshtoken.repository.RefreshTokenRepository;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletResponse;

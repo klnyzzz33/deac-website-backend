@@ -11,6 +11,8 @@ public interface NewsService {
 
     String deleteNews(Integer newId);
 
+    String deleteSelectedNews(List<Integer> newsIds);
+
     String updateNews(ModifyDto modifyDto);
 
     List<NewsInfoDto> listNews(int pageNumber, int pageSize);

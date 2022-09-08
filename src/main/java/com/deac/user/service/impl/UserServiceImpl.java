@@ -167,6 +167,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         return authentication.getName();
     }
 
+    @Override
     public Collection<? extends GrantedAuthority> getCurrentAuthorities() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getAuthorities();
