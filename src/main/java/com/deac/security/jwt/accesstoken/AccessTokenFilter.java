@@ -55,10 +55,8 @@ public class AccessTokenFilter extends OncePerRequestFilter {
                 accessTokenProvider.authorize(accessToken);
                 filterChain.doFilter(httpServletRequest, httpServletResponse);
             } catch (ExpiredJwtException e) {
-                SecurityContextHolder.clearContext();
                 throw new MyException("Expired access token", HttpStatus.UNAUTHORIZED);
             } catch (JwtException | IllegalArgumentException e) {
-                SecurityContextHolder.clearContext();
                 throw new MyException("Invalid access token", HttpStatus.UNAUTHORIZED);
             }
         } catch (MyException e) {

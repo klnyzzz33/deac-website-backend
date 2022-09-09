@@ -43,6 +43,7 @@ public class PrivilegesFilter extends OncePerRequestFilter {
                 throw new MyException("You are not logged in", HttpStatus.UNAUTHORIZED);
             }
         } catch (MyException e) {
+            SecurityContextHolder.clearContext();
             httpServletResponse.setStatus(e.getHttpStatus().value());
             httpServletResponse.getWriter().write(objectMapper.writeValueAsString(e.getMessage()));
         }

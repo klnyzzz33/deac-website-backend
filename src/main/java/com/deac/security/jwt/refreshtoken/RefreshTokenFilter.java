@@ -59,13 +59,10 @@ public class RefreshTokenFilter extends OncePerRequestFilter {
                 refreshTokenProvider.authorize(refreshToken);
                 filterChain.doFilter(httpServletRequest, httpServletResponse);
             } catch (ExpiredJwtException e) {
-                SecurityContextHolder.clearContext();
                 throw new MyException("Expired refresh token", HttpStatus.UNAUTHORIZED);
             } catch (JwtException | IllegalArgumentException e) {
-                SecurityContextHolder.clearContext();
                 throw new MyException("Invalid refresh token", HttpStatus.UNAUTHORIZED);
             } catch (DataAccessException e) {
-                SecurityContextHolder.clearContext();
                 throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
             }
         } catch (MyException e) {

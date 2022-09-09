@@ -7,6 +7,8 @@ import com.deac.user.dto.ResetDto;
 import com.deac.response.ResponseMessage;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +32,8 @@ public class UserController {
 
     private final ModelMapper modelMapper;
 
+    private final ObjectMapper objectMapper;
+
     @Value("${jwt.access.validity}")
     private long accessCookieAge;
 
@@ -37,9 +41,10 @@ public class UserController {
     private long refreshCookieAge;
 
     @Autowired
-    public UserController(UserService userService, ModelMapper modelMapper) {
+    public UserController(UserService userService, ModelMapper modelMapper, ObjectMapper objectMapper) {
         this.userService = userService;
         this.modelMapper = modelMapper;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping("/api/user/auth/login")
@@ -67,9 +72,18 @@ public class UserController {
         return new ResponseMessage(userService.verifyEmail(token));
     }
 
-    @GetMapping("/api/user/current_user")
-    public ResponseMessage getCurrentUser() {
+    @GetMapping("/api/user/current_user_name")
+    public ResponseMessage getCurrentUserName() {
         return new ResponseMessage(userService.getCurrentUsername());
+    }
+
+    @GetMapping("/api/user/current_user_authorities")
+    public ResponseMessage getCurrentUserAuthorities() {
+        try {
+            return new ResponseMessage(objectMapper.writeValueAsString(userService.getCurrentAuthorities()));
+        } catch (JsonProcessingException e) {
+            throw new MyException("Could not get authorities", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @PostMapping("/api/user/auth/refresh")

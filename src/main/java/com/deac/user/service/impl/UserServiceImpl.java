@@ -19,12 +19,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -35,6 +37,7 @@ import org.springframework.stereotype.Service;
 import javax.mail.MessagingException;
 import javax.servlet.http.HttpServletResponse;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService, UserDetailsService {
@@ -97,7 +100,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         try {
             Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
             SecurityContextHolder.getContext().setAuthentication(authentication);
-            Collection<? extends GrantedAuthority> roles = authentication.getAuthorities();
+            List<SimpleGrantedAuthority> roles = authentication.getAuthorities()
+                    .stream().map(role -> new SimpleGrantedAuthority(role.toString())).collect(Collectors.toList());
             Date now = new Date();
             Date absoluteValidity = new Date(now.getTime() + refreshTokenProvider.getRefreshTokenAbsoluteValidityInMilliseconds());
             long loginIdentifier = now.getTime();
@@ -146,7 +150,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             String newRefreshToken = refreshTokenProvider.updateToken(refreshToken, username, "refresh-token", roles, loginIdentifier, absoluteValidity);
             return Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken);
         } catch (Exception e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Could not refresh token", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -157,7 +161,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             SecurityContextHolder.clearContext();
             return "Successfully logged out";
         } catch (Exception e) {
-            throw new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Could not log out", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -170,6 +174,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     @Override
     public Collection<? extends GrantedAuthority> getCurrentAuthorities() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication instanceof AnonymousAuthenticationToken) {
+            return List.of();
+        }
         return authentication.getAuthorities();
     }
 
@@ -244,7 +251,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
                     "<h3>We've noticed that your password to your account has been changed. If this wasn't you, please contact our support immediately.");
             return "Password successfully reset";
         } catch (MessagingException e) {
-            return "Recovery link sent if user exists";
+            return "Password successfully reset";
         }
     }
 
