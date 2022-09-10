@@ -94,12 +94,12 @@ public class UserController {
                     .map(Cookie::getValue)
                     .findFirst()
                     .orElseThrow(() -> new MyException("Expired refresh cookie", HttpStatus.UNAUTHORIZED));
-            Map<String, String> tokens = userService.refresh(refreshToken);
-            ResponseCookie newAccessCookie = userService.setCookie("access-token", tokens.get("accessToken"), accessCookieAge, true, "/");
-            ResponseCookie newRefreshCookie = userService.setCookie("refresh-token", tokens.get("refreshToken"), refreshCookieAge, true, "/api/user/auth");
+            Map<String, String> values = userService.refresh(refreshToken);
+            ResponseCookie newAccessCookie = userService.setCookie("access-token", values.get("accessToken"), accessCookieAge, true, "/");
+            ResponseCookie newRefreshCookie = userService.setCookie("refresh-token", values.get("refreshToken"), refreshCookieAge, true, "/api/user/auth");
             response.addHeader(HttpHeaders.SET_COOKIE, newAccessCookie.toString());
             response.addHeader(HttpHeaders.SET_COOKIE, newRefreshCookie.toString());
-            return new ResponseMessage("Successful refresh");
+            return new ResponseMessage(values.get("authorities"));
         } catch (MyException e) {
             userService.removeCookies(response);
             throw e;

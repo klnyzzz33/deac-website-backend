@@ -148,7 +148,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             long loginIdentifier = refreshTokenProvider.getLoginIdentifierFromToken(refreshToken);
             String newAccessToken = accessTokenProvider.createToken(username, "access-token", roles);
             String newRefreshToken = refreshTokenProvider.updateToken(refreshToken, username, "refresh-token", roles, loginIdentifier, absoluteValidity);
-            return Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken);
+            return Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken, "authorities", objectMapper.writeValueAsString(roles));
         } catch (Exception e) {
             throw new MyException("Could not refresh token", HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -174,9 +174,6 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     @Override
     public Collection<? extends GrantedAuthority> getCurrentAuthorities() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication instanceof AnonymousAuthenticationToken) {
-            return List.of();
-        }
         return authentication.getAuthorities();
     }
 

@@ -1,6 +1,7 @@
 package com.deac.security.jwt.accesstoken;
 
 import com.deac.exception.MyException;
+import com.deac.response.ResponseMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -25,7 +26,8 @@ public class AccessTokenFilter extends OncePerRequestFilter {
             "/api/user/forgot",
             "/api/user/reset",
             "/api/user/verify",
-            "/api/user/auth/refresh"};
+            "/api/user/auth/refresh",
+            "/api/news/**"};
 
     private final AccessTokenProvider accessTokenProvider;
 
