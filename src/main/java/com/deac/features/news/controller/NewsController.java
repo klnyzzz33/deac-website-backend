@@ -23,7 +23,10 @@ public class NewsController {
 
     @PostMapping("/api/admin/news/create")
     public ResponseMessage createNews(@Valid @RequestBody NewsDto newsDto) {
-        Integer newsId = newsService.createNews(newsDto.getTitle(), newsDto.getDescription(), newsDto.getContent());
+        Integer newsId = newsService.createNews(newsDto.getTitle(),
+                newsDto.getDescription(),
+                newsDto.getContent(),
+                newsDto.getIndexImageUrl());
         return new ResponseMessage(newsId.toString());
     }
 

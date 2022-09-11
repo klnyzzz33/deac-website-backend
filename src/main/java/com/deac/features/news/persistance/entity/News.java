@@ -29,6 +29,8 @@ public class News {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    private String indexImageUrl;
+
     @Column(nullable = false)
     private Integer authorId;
 
@@ -40,10 +42,11 @@ public class News {
     @ToString.Exclude
     private List<ModifyEntry> modifyEntries;
 
-    public News(String title, String description, String content, Integer authorId, Date createDate) {
+    public News(String title, String description, String content, String indexImageUrl, Integer authorId, Date createDate) {
         this.title = title;
         this.description = description;
         this.content = content;
+        this.indexImageUrl = indexImageUrl;
         this.authorId = authorId;
         this.createDate = createDate;
         this.modifyEntries = new ArrayList<>();

@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface NewsService {
 
-    Integer createNews(String title, String description, String content);
+    Integer createNews(String title, String description, String content, String indexImageUrl);
 
     String deleteNews(Integer newId);
 

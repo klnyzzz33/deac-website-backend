@@ -34,8 +34,11 @@ public class NewsServiceImpl implements NewsService {
     }
 
     @Override
-    public Integer createNews(String title, String description, String content) {
-        News news = new News(title, description, content, userService.getCurrentUserId(), new Date());
+    public Integer createNews(String title, String description, String content, String indexImageUrl) {
+        if (indexImageUrl == null || indexImageUrl.isEmpty()) {
+            indexImageUrl = "http://localhost/img/news-icon.png";
+        }
+        News news = new News(title, description, content, indexImageUrl, userService.getCurrentUserId(), new Date());
         newsRepository.save(news);
         return news.getId();
     }
@@ -71,6 +74,7 @@ public class NewsServiceImpl implements NewsService {
         news.setTitle(modifyDto.getTitle());
         news.setDescription(modifyDto.getDescription());
         news.setContent(modifyDto.getContent());
+        news.setIndexImageUrl(modifyDto.getIndexImageUrl());
         ModifyEntry modifyEntry = new ModifyEntry(new Date(), userService.getCurrentUserId());
         news.getModifyEntries().add(modifyEntry);
         newsRepository.save(news);
@@ -108,6 +112,7 @@ public class NewsServiceImpl implements NewsService {
                             news.getTitle(),
                             news.getDescription(),
                             null,
+                            news.getIndexImageUrl(),
                             userService.getUser(news.getAuthorId()),
                             news.getCreateDate(),
                             latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
@@ -132,6 +137,7 @@ public class NewsServiceImpl implements NewsService {
                 news.getTitle(),
                 news.getDescription(),
                 news.getContent(),
+                news.getIndexImageUrl(),
                 userService.getUser(news.getAuthorId()),
                 news.getCreateDate(),
                 latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);

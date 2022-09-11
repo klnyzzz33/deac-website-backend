@@ -25,4 +25,6 @@ public class ModifyDto {
     @NotNull(message = "Content not specified")
     private String content;
 
+    private String indexImageUrl;
+
 }

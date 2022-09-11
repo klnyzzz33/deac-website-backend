@@ -22,4 +22,6 @@ public class NewsDto {
     @NotNull(message = "Content not specified")
     private String content;
 
+    private String indexImageUrl;
+
 }

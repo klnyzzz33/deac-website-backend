@@ -19,6 +19,8 @@ public class NewsInfoDto {
 
     private String content;
 
+    private String indexImageUrl;
+
     private String author;
 
     private Date createDate;
