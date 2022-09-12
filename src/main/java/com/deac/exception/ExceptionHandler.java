@@ -18,7 +18,7 @@ public class ExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @org.springframework.web.bind.annotation.ExceptionHandler(value = DataAccessException.class)
-    protected ResponseEntity<Object> handleConflict(WebRequest request) {
+    protected ResponseEntity<Object> handleConflict(DataAccessException exception, WebRequest request) {
         return handleConflict(new MyException("Internal server error", HttpStatus.INTERNAL_SERVER_ERROR), request);
     }
 
