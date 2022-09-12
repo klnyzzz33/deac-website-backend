@@ -7,6 +7,7 @@ import com.deac.features.news.service.NewsService;
 import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
 import java.util.List;
@@ -19,6 +20,11 @@ public class NewsController {
     @Autowired
     public NewsController(NewsService newsService) {
         this.newsService = newsService;
+    }
+
+    @PostMapping("/api/admin/news/upload_image")
+    public ResponseMessage uploadImage(@RequestParam("indexImage") MultipartFile file) {
+        return new ResponseMessage(newsService.uploadImage(file));
     }
 
     @PostMapping("/api/admin/news/create")

@@ -2,10 +2,13 @@ package com.deac.features.news.service;
 
 import com.deac.features.news.dto.ModifyDto;
 import com.deac.features.news.dto.NewsInfoDto;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 public interface NewsService {
+
+    String uploadImage(MultipartFile file);
 
     Integer createNews(String title, String description, String content, String indexImageUrl);
 
