@@ -74,7 +74,11 @@ public class NewsServiceImpl implements NewsService {
         news.setTitle(modifyDto.getTitle());
         news.setDescription(modifyDto.getDescription());
         news.setContent(modifyDto.getContent());
-        news.setIndexImageUrl(modifyDto.getIndexImageUrl());
+        String indexImageUrl = modifyDto.getIndexImageUrl();
+        if (indexImageUrl == null || indexImageUrl.isEmpty()) {
+            indexImageUrl = "http://localhost/img/news-icon.png";
+        }
+        news.setIndexImageUrl(indexImageUrl);
         ModifyEntry modifyEntry = new ModifyEntry(new Date(), userService.getCurrentUserId());
         news.getModifyEntries().add(modifyEntry);
         newsRepository.save(news);
