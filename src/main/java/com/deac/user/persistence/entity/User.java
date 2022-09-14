@@ -1,5 +1,6 @@
 package com.deac.user.persistence.entity;
 
+import com.deac.features.membership.persistence.entity.MembershipEntry;
 import lombok.*;
 
 import javax.persistence.*;
@@ -34,12 +35,22 @@ public class User {
     @Column(nullable = false)
     private boolean isVerified;
 
+    @Column(nullable = false)
+    private boolean isEnabled;
+
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "membershipentry_id")
+    @ToString.Exclude
+    private MembershipEntry membershipEntry;
+
     public User(String username, String email, String password, List<Role> roles) {
         this.username = username;
         this.email = email;
         this.password = password;
         this.roles = roles;
         this.isVerified = false;
+        this.isEnabled = false;
+        this.membershipEntry = null;
     }
 
 }

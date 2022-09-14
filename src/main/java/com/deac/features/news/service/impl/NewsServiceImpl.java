@@ -3,15 +3,14 @@ package com.deac.features.news.service.impl;
 import com.deac.features.news.dto.ModifyDto;
 import com.deac.features.news.dto.ModifyInfoDto;
 import com.deac.features.news.dto.NewsInfoDto;
-import com.deac.features.news.persistance.entity.ModifyEntry;
-import com.deac.features.news.persistance.entity.News;
-import com.deac.features.news.persistance.repository.NewsRepository;
+import com.deac.features.news.persistence.entity.ModifyEntry;
+import com.deac.features.news.persistence.entity.News;
+import com.deac.features.news.persistence.repository.NewsRepository;
 import com.deac.features.news.service.NewsService;
 import com.deac.exception.MyException;
 import com.deac.user.service.UserService;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -128,11 +127,15 @@ public class NewsServiceImpl implements NewsService {
         news.setTitle(modifyDto.getTitle());
         news.setDescription(modifyDto.getDescription());
         news.setContent(modifyDto.getContent());
-        String indexImageUrl = modifyDto.getIndexImageUrl();
-        if (indexImageUrl == null || indexImageUrl.isEmpty()) {
-            indexImageUrl = "http://localhost/img/news-icon.png";
+        if (modifyDto.isIndexImageModified()) {
+            String indexImageUrl = modifyDto.getIndexImageUrl();
+            if (indexImageUrl == null || indexImageUrl.isEmpty()) {
+                indexImageUrl = imageUploadBaseUrl + "news-icon.png";
+            } else {
+                indexImageUrl = imageUploadBaseUrl + indexImageUrl;
+            }
+            news.setIndexImageUrl(indexImageUrl);
         }
-        news.setIndexImageUrl(indexImageUrl);
         ModifyEntry modifyEntry = new ModifyEntry(new Date(), userService.getCurrentUserId());
         news.getModifyEntries().add(modifyEntry);
         newsRepository.save(news);

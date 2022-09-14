@@ -27,4 +27,6 @@ public class ModifyDto {
 
     private String indexImageUrl;
 
+    private boolean indexImageModified = false;
+
 }

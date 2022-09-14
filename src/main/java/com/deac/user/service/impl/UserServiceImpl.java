@@ -1,5 +1,6 @@
 package com.deac.user.service.impl;
 
+import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.mail.EmailService;
 import com.deac.exception.MyException;
 import com.deac.security.jwt.refreshtoken.RefreshTokenProvider;
@@ -78,6 +79,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         if (!this.userRepository.existsByRoles(List.of(Role.ADMIN))) {
             User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(Role.ADMIN));
             admin.setVerified(true);
+            admin.setEnabled(true);
             this.userRepository.save(admin);
         }
     }
@@ -91,6 +93,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         User user = userOptional.get();
         if (!user.isVerified()) {
             throw new MyException("Email not verified yet", HttpStatus.UNAUTHORIZED);
+        } else if (!user.isEnabled()) {
+            throw new MyException("Account disabled", HttpStatus.UNAUTHORIZED);
         }
         return new org.springframework.security.core.userdetails.User(username, user.getPassword(), user.getRoles());
     }
@@ -124,6 +128,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
                 throw new MyException("Username or email already exists", HttpStatus.CONFLICT);
             }
             user.setPassword(passwordEncoder.encode(user.getPassword()));
+            user.setRoles(List.of(Role.CLIENT));
+            user.setEnabled(true);
+            user.setMembershipEntry(new MembershipEntry());
             userRepository.save(user);
             String verifyToken = RandomStringUtils.randomAlphanumeric(64, 96);
             String verifyTokenHash = DigestUtils.sha256Hex(verifyToken);
@@ -189,6 +196,16 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             throw new MyException("Given user does not exist", HttpStatus.BAD_REQUEST);
         }
         return user.get().getUsername();
+    }
+
+    @Override
+    public void setEnabled(String username, boolean isEnabled) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new MyException("User does not exist", HttpStatus.BAD_REQUEST));
+        user.setEnabled(isEnabled);
+        userRepository.save(user);
+        if (!isEnabled) {
+            refreshTokenProvider.invalidateUserTokens(username);
+        }
     }
 
     @Override

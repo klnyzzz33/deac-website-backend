@@ -1,6 +1,6 @@
-package com.deac.features.news.persistance.repository;
+package com.deac.features.news.persistence.repository;
 
-import com.deac.features.news.persistance.entity.News;
+import com.deac.features.news.persistence.entity.News;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

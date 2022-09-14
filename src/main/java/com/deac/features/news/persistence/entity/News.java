@@ -1,4 +1,4 @@
-package com.deac.features.news.persistance.entity;
+package com.deac.features.news.persistence.entity;
 
 import lombok.*;
 import org.springframework.format.annotation.DateTimeFormat;
