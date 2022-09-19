@@ -2,6 +2,7 @@ package com.deac.features.membership.service.impl;
 
 import com.deac.exception.MyException;
 import com.deac.features.membership.dto.MembershipEntryInfoDto;
+import com.deac.features.membership.dto.ProfileDto;
 import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.membership.persistence.repository.MembershipRepository;
 import com.deac.features.membership.service.MembershipService;
@@ -37,9 +38,18 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
+    public String toggleApproved(String username, boolean isApproved) {
+        MembershipEntry membershipEntry = membershipRepository.findByUsername(username).orElseThrow(() -> new MyException("Membership does not exist", HttpStatus.BAD_REQUEST));
+        membershipEntry.setApproved(isApproved);
+        membershipRepository.save(membershipEntry);
+        return "Monthly transaction approval status: " + isApproved;
+    }
+
+    @Override
     public String toggleHasPaidMembershipFee(String username, boolean hasPaidMembershipFee) {
         MembershipEntry membershipEntry = membershipRepository.findByUsername(username).orElseThrow(() -> new MyException("Membership does not exist", HttpStatus.BAD_REQUEST));
         membershipEntry.setHasPaidMembershipFee(hasPaidMembershipFee);
+        membershipRepository.save(membershipEntry);
         return "Membership fee paid: " + hasPaidMembershipFee;
     }
 
@@ -70,6 +80,20 @@ public class MembershipServiceImpl implements MembershipService {
     @Override
     public long getNumberOfMemberships() {
         return membershipRepository.count();
+    }
+
+    @Override
+    public ProfileDto getProfileData() {
+        String username = userService.getCurrentUsername();
+        MembershipEntry membershipEntry = membershipRepository.findByUsername(username).orElseThrow(() -> new MyException("Membership does not exist", HttpStatus.BAD_REQUEST));
+        return new ProfileDto(
+                username,
+                membershipEntry.getUser().getEmail(),
+                membershipEntry.getMemberSince(),
+                membershipEntry.isHasPaidMembershipFee(),
+                membershipEntry.getMonthlyTransactionReceiptPath(),
+                membershipEntry.isApproved()
+        );
     }
 
 }

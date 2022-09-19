@@ -21,13 +21,15 @@ import java.util.Optional;
 
 public class AccessTokenFilter extends OncePerRequestFilter {
 
-    private static final String[] excludedEndPoints = new String[]{"/api/user/auth/login",
+    private static final String[] excludedEndPoints = new String[]{
+            "/api/user/auth/login",
             "/api/user/register",
             "/api/user/forgot",
             "/api/user/reset",
             "/api/user/verify",
             "/api/user/auth/refresh",
-            "/api/news/**"};
+            "/api/news/**"
+    };
 
     private final AccessTokenProvider accessTokenProvider;
 

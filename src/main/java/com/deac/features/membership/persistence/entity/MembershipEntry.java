@@ -35,4 +35,6 @@ public class MembershipEntry {
     @Column(nullable = false)
     private boolean approved = false;
 
+    private String customerId = null;
+
 }

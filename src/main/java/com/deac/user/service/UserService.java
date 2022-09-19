@@ -27,6 +27,8 @@ public interface UserService {
 
     String getUser(Integer userId);
 
+    User getCurrentUser();
+
     void setEnabled(String username, boolean isEnabled);
 
     String recoverPassword(String email) throws MessagingException;

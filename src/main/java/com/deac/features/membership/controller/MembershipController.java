@@ -2,6 +2,7 @@ package com.deac.features.membership.controller;
 
 import com.deac.features.membership.dto.MembershipDto;
 import com.deac.features.membership.dto.MembershipEntryInfoDto;
+import com.deac.features.membership.dto.ProfileDto;
 import com.deac.features.membership.service.MembershipService;
 import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,9 +26,9 @@ public class MembershipController {
         return new ResponseMessage(membershipService.toggleUserEnabled(membershipDto.getUsername(), membershipDto.isModifiedBoolean()));
     }
 
-    @PostMapping("/api/admin/memberships/fee")
-    public ResponseMessage toggleHasPaidMembershipFee(@Valid @RequestBody MembershipDto membershipDto) {
-        return new ResponseMessage(membershipService.toggleHasPaidMembershipFee(membershipDto.getUsername(), membershipDto.isModifiedBoolean()));
+    @PostMapping("/api/admin/memberships/approve")
+    public ResponseMessage toggleApproved(@Valid @RequestBody MembershipDto membershipDto) {
+        return new ResponseMessage(membershipService.toggleApproved(membershipDto.getUsername(), membershipDto.isModifiedBoolean()));
     }
 
     @GetMapping("/api/admin/memberships/list")
@@ -39,6 +40,11 @@ public class MembershipController {
     @GetMapping("/api/admin/memberships/count")
     public Long getNumberOfMembershipEntries() {
         return membershipService.getNumberOfMemberships();
+    }
+
+    @GetMapping("/api/memberships/profile")
+    public ProfileDto getProfileData() {
+        return membershipService.getProfileData();
     }
 
 }

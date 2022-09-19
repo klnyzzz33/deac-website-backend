@@ -14,13 +14,15 @@ import com.deac.user.token.entity.TokenKey;
 import com.deac.user.token.repository.TokenRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.stripe.exception.StripeException;
+import com.stripe.model.Customer;
+import com.stripe.param.CustomerCreateParams;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -131,6 +133,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             user.setRoles(List.of(Role.CLIENT));
             user.setEnabled(true);
             user.setMembershipEntry(new MembershipEntry());
+            createCustomer(user);
             userRepository.save(user);
             String verifyToken = RandomStringUtils.randomAlphanumeric(64, 96);
             String verifyTokenHash = DigestUtils.sha256Hex(verifyToken);
@@ -143,6 +146,19 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         } catch (MessagingException e) {
             userRepository.delete(user);
             throw new MyException("Could not send registration confirmation email", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private void createCustomer(User user) {
+        try {
+            CustomerCreateParams customerCreateParams = CustomerCreateParams.builder()
+                    .setName(user.getUsername())
+                    .setEmail(user.getEmail())
+                    .build();
+            Customer customer = Customer.create(customerCreateParams);
+            user.getMembershipEntry().setCustomerId(customer.getId());
+        } catch (StripeException e) {
+            throw new MyException("Could not initialize customer for future payments", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -193,9 +209,18 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     public String getUser(Integer userId) {
         Optional<User> user = userRepository.findById(userId);
         if (user.isEmpty()) {
-            throw new MyException("Given user does not exist", HttpStatus.BAD_REQUEST);
+            throw new MyException("User does not exist", HttpStatus.BAD_REQUEST);
         }
         return user.get().getUsername();
+    }
+
+    @Override
+    public User getCurrentUser() {
+        Optional<User> user = userRepository.findByUsername(getCurrentUsername());
+        if (user.isEmpty()) {
+            throw new MyException("User does not exist", HttpStatus.BAD_REQUEST);
+        }
+        return user.get();
     }
 
     @Override
