@@ -67,6 +67,7 @@ public class PaymentService {
             PaymentIntentCreateParams.Builder createParams = PaymentIntentCreateParams.builder()
                     .setAmount(amount)
                     .setCurrency(currency)
+                    .setReceiptEmail(userService.getCurrentUser().getEmail())
                     .setPaymentMethod(paymentConfirmDto.getPaymentMethodId())
                     .setConfirmationMethod(PaymentIntentCreateParams.ConfirmationMethod.MANUAL)
                     .setConfirm(true);
@@ -83,6 +84,16 @@ public class PaymentService {
                 }
             }
             PaymentIntent paymentIntent = PaymentIntent.create(createParams.build());
+            return evaluatePaymentStatus(paymentIntent);
+        } catch (StripeException e) {
+            throw new MyException(e.getUserMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public PaymentStatusDto makePaymentAfterAuthentication(String paymentIntentId) {
+        try {
+            PaymentIntent paymentIntent = PaymentIntent.retrieve(paymentIntentId);
+            paymentIntent = paymentIntent.confirm();
             return evaluatePaymentStatus(paymentIntent);
         } catch (StripeException e) {
             throw new MyException(e.getUserMessage(), HttpStatus.INTERNAL_SERVER_ERROR);

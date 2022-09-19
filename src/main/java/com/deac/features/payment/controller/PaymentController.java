@@ -19,7 +19,7 @@ public class PaymentController {
         this.paymentService = paymentService;
     }
 
-    @PostMapping("/api/payment/list")
+    @PostMapping("/api/payment/list_methods")
     public List<PaymentMethodDto> listPaymentMethods() {
         return paymentService.listPaymentMethods();
     }
@@ -27,6 +27,11 @@ public class PaymentController {
     @PostMapping("/api/payment/confirm")
     public PaymentStatusDto makePayment(@RequestBody PaymentConfirmDto paymentConfirmDto) {
         return paymentService.makePayment(paymentConfirmDto);
+    }
+
+    @PostMapping("/api/payment/confirm_after_authenticate")
+    public PaymentStatusDto makePaymentAfterAuthentication(@RequestBody String paymentIntentId) {
+        return paymentService.makePaymentAfterAuthentication(paymentIntentId);
     }
 
 }
