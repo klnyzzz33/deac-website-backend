@@ -31,9 +31,13 @@ public interface UserService {
 
     void setEnabled(String username, boolean isEnabled);
 
-    String recoverPassword(String email) throws MessagingException;
+    void saveUser(User user);
+
+    String recoverPassword(String email);
 
     String resetPassword(String token, String password);
+
+    String sendUsernameReminderEmail(String email);
 
     String verifyEmail(String token);
 

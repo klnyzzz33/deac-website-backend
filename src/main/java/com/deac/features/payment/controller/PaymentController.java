@@ -2,8 +2,10 @@ package com.deac.features.payment.controller;
 
 import com.deac.features.payment.dto.PaymentConfirmDto;
 import com.deac.features.payment.dto.PaymentMethodDto;
+import com.deac.features.payment.dto.PaymentReceiptDto;
 import com.deac.features.payment.dto.PaymentStatusDto;
 import com.deac.features.payment.service.PaymentService;
+import com.deac.response.ResponseMessage;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,6 +34,11 @@ public class PaymentController {
     @PostMapping("/api/payment/confirm_after_authenticate")
     public PaymentStatusDto makePaymentAfterAuthentication(@RequestBody String paymentIntentId) {
         return paymentService.makePaymentAfterAuthentication(paymentIntentId);
+    }
+
+    @PostMapping("/api/payment/save")
+    public ResponseMessage savePayment(@RequestBody PaymentReceiptDto paymentReceiptDto) {
+        return new ResponseMessage(paymentService.savePayment(paymentReceiptDto));
     }
 
 }

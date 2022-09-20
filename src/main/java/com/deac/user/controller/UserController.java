@@ -118,14 +118,19 @@ public class UserController {
         }
     }
 
-    @PostMapping("/api/user/forgot")
-    public ResponseMessage sendPasswordRecoveryLink(@RequestBody String email) throws MessagingException {
+    @PostMapping("/api/user/forgot_password")
+    public ResponseMessage sendPasswordRecoveryLink(@RequestBody String email) {
         return new ResponseMessage(userService.recoverPassword(email));
     }
 
-    @PostMapping("/api/user/reset")
+    @PostMapping("/api/user/reset_password")
     public ResponseMessage changePassword(@Valid @RequestBody ResetDto resetDto) {
         return new ResponseMessage(userService.resetPassword(resetDto.getToken(), resetDto.getPassword()));
+    }
+
+    @PostMapping("/api/user/forgot_username")
+    public ResponseMessage sendUsernameReminderEmail(@RequestBody String email) {
+        return new ResponseMessage(userService.sendUsernameReminderEmail(email));
     }
 
 }

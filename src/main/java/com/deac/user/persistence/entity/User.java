@@ -4,6 +4,7 @@ import com.deac.features.membership.persistence.entity.MembershipEntry;
 import lombok.*;
 
 import javax.persistence.*;
+import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 import java.util.List;
 
@@ -29,6 +30,12 @@ public class User {
     @Size(min = 8, message = "Minimum password length: 8 characters")
     private String password;
 
+    @Column(nullable = false)
+    private String surname;
+
+    @Column(nullable = false)
+    private String lastname;
+
     @ElementCollection(fetch = FetchType.EAGER)
     private List<Role> roles;
 
@@ -43,10 +50,12 @@ public class User {
     @ToString.Exclude
     private MembershipEntry membershipEntry;
 
-    public User(String username, String email, String password, List<Role> roles) {
+    public User(String username, String email, String password, String surname, String lastname, List<Role> roles) {
         this.username = username;
         this.email = email;
         this.password = password;
+        this.surname = surname;
+        this.lastname = lastname;
         this.roles = roles;
         this.isVerified = false;
         this.isEnabled = false;

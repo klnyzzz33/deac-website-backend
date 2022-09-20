@@ -22,6 +22,12 @@ public class RegisterDto {
     @NotNull(message = "Password not specified")
     private String password;
 
+    @NotNull(message = "Surname not specified")
+    private String surname;
+
+    @NotNull(message = "Lastname not specified")
+    private String lastname;
+
     @NotNull(message = "Roles not specified")
     List<Role> roles;
 

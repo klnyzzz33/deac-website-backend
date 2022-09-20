@@ -24,8 +24,9 @@ public class AccessTokenFilter extends OncePerRequestFilter {
     private static final String[] excludedEndPoints = new String[]{
             "/api/user/auth/login",
             "/api/user/register",
-            "/api/user/forgot",
-            "/api/user/reset",
+            "/api/user/forgot_password",
+            "/api/user/reset_password",
+            "/api/user/forgot_username",
             "/api/user/verify",
             "/api/user/auth/refresh",
             "/api/news/**"

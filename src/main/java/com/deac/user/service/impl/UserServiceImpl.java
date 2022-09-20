@@ -79,7 +79,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         this.refreshTokenProvider = refreshTokenProvider;
         this.emailService = emailService;
         if (!this.userRepository.existsByRoles(List.of(Role.ADMIN))) {
-            User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), List.of(Role.ADMIN));
+            User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), "Admin", "", List.of(Role.ADMIN));
             admin.setVerified(true);
             admin.setEnabled(true);
             this.userRepository.save(admin);
@@ -234,6 +234,11 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
+    public void saveUser(User user) {
+        userRepository.save(user);
+    }
+
+    @Override
     public String recoverPassword(String email) {
         try {
             Optional<User> userOptional = userRepository.findByEmail(email);
@@ -249,7 +254,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             Long expiresAt = System.currentTimeMillis() + 300000;
             emailService.sendMessage(email,
                     "Reset your password",
-                    "<h3>You've issued a request to reset your password. In order to do that, please follow this link: </h3><br>http://localhost:4200/reset?token=" + passwordToken);
+                    "<h3>You've issued a request to reset your password. In order to do that, please follow this link: </h3><br>http://localhost:4200/reset-password?token=" + passwordToken);
             tokenRepository.save(new Token(new TokenKey(user.getId(), passwordTokenHash), expiresAt, "password-reset"));
             return "Recovery link sent if user exists";
         } catch (MessagingException e) {
@@ -291,6 +296,23 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             return "Password successfully reset";
         } catch (MessagingException e) {
             return "Password successfully reset";
+        }
+    }
+
+    @Override
+    public String sendUsernameReminderEmail(String email) {
+        try {
+            Optional<User> userOptional = userRepository.findByEmail(email);
+            if (userOptional.isEmpty()) {
+                return "Recovery email sent if user exists";
+            }
+            User user = userOptional.get();
+            emailService.sendMessage(email,
+                    "Username reminder",
+                    "<h3>You've issued a request to get a reminder of your username.</h3><br><h3>Your username associated with this email is " + user.getUsername() + ".</h3>");
+            return "Recovery email sent if user exists";
+        } catch (MessagingException e) {
+            return "Recovery email sent if user exists";
         }
     }
 
