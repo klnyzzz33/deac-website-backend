@@ -6,6 +6,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.persistence.*;
 import java.util.Date;
+import java.util.List;
 
 @Entity
 @Getter
@@ -30,7 +31,9 @@ public class MembershipEntry {
     @Column(nullable = false)
     private boolean hasPaidMembershipFee = false;
 
-    private String monthlyTransactionReceiptPath = null;
+    @OneToMany(cascade = CascadeType.ALL)
+    @ToString.Exclude
+    private List<MonthlyTransaction> monthlyTransactions = List.of();
 
     @Column(nullable = false)
     private boolean approved = false;

@@ -17,8 +17,6 @@ public class MembershipEntryInfoDto {
 
     private boolean hasPaidMembershipFee;
 
-    private String monthlyTransactionReceiptPath;
-
     private boolean isEnabled;
 
     private boolean approved;

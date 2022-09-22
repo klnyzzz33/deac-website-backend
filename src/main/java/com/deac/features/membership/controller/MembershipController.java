@@ -2,10 +2,13 @@ package com.deac.features.membership.controller;
 
 import com.deac.features.membership.dto.MembershipDto;
 import com.deac.features.membership.dto.MembershipEntryInfoDto;
+import com.deac.features.membership.dto.MonthlyTransactionDto;
 import com.deac.features.membership.dto.ProfileDto;
 import com.deac.features.membership.service.MembershipService;
 import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -45,6 +48,20 @@ public class MembershipController {
     @GetMapping("/api/memberships/profile")
     public ProfileDto getProfileData() {
         return membershipService.getProfileData();
+    }
+
+    @GetMapping("/api/memberships/profile/transactions/list")
+    public List<MonthlyTransactionDto> listCurrentUserTransactions() {
+        return membershipService.listCurrentUserTransactions();
+    }
+
+    @PostMapping("/api/memberships/profile/transactions/download")
+    public ResponseEntity<byte[]> downloadCurrentUserReceipt(@RequestBody String receiptPath) {
+        byte[] bytes = membershipService.downloadCurrentUserReceipt(receiptPath);
+        return ResponseEntity.ok()
+                .contentLength(bytes.length)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(bytes);
     }
 
 }

@@ -3,6 +3,7 @@ package com.deac.features.membership.dto;
 import lombok.*;
 
 import java.util.Date;
+import java.util.List;
 
 @Getter
 @Setter
@@ -18,8 +19,6 @@ public class ProfileDto {
     private Date memberSince;
 
     private boolean hasPaidMembershipFee;
-
-    private String monthlyTransactionReceiptPath;
 
     private boolean approved;
 

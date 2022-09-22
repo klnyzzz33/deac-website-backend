@@ -2,6 +2,7 @@ package com.deac.features.payment.service;
 
 import com.deac.exception.MyException;
 import com.deac.features.membership.persistence.entity.MembershipEntry;
+import com.deac.features.membership.persistence.entity.MonthlyTransaction;
 import com.deac.features.payment.dto.PaymentConfirmDto;
 import com.deac.features.payment.dto.PaymentMethodDto;
 import com.deac.features.payment.dto.PaymentReceiptDto;
@@ -12,8 +13,6 @@ import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
 import com.stripe.model.*;
 import com.stripe.param.*;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -29,10 +28,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -147,9 +146,10 @@ public class PaymentService {
         currentUserMembershipEntry.setHasPaidMembershipFee(true);
         currentUserMembershipEntry.setApproved(true);
         try {
-            currentUserMembershipEntry.setMonthlyTransactionReceiptPath(generatePaymentReceipt(paymentReceiptDto, currentUser));
-        } catch (Exception e) {
-            currentUserMembershipEntry.setMonthlyTransactionReceiptPath(null);
+            currentUserMembershipEntry.getMonthlyTransactions().add(
+                    new MonthlyTransaction(YearMonth.now(), generatePaymentReceipt(paymentReceiptDto, currentUser))
+            );
+        } catch (Exception ignored) {
         }
         currentUser.setMembershipEntry(currentUserMembershipEntry);
         userService.saveUser(currentUser);

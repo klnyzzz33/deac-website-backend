@@ -2,20 +2,28 @@ package com.deac.features.membership.service.impl;
 
 import com.deac.exception.MyException;
 import com.deac.features.membership.dto.MembershipEntryInfoDto;
+import com.deac.features.membership.dto.MonthlyTransactionDto;
 import com.deac.features.membership.dto.ProfileDto;
 import com.deac.features.membership.persistence.entity.MembershipEntry;
+import com.deac.features.membership.persistence.entity.MonthlyTransaction;
 import com.deac.features.membership.persistence.repository.MembershipRepository;
 import com.deac.features.membership.service.MembershipService;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,10 +33,13 @@ public class MembershipServiceImpl implements MembershipService {
 
     private final UserService userService;
 
+    private final String receiptsBaseDirectory;
+
     @Autowired
-    public MembershipServiceImpl(MembershipRepository membershipRepository, UserService userService) {
+    public MembershipServiceImpl(MembershipRepository membershipRepository, UserService userService, Environment environment) {
         this.membershipRepository = membershipRepository;
         this.userService = userService;
+        receiptsBaseDirectory = Objects.requireNonNull(environment.getProperty("file.receipts.rootdir", String.class));
     }
 
     @Override
@@ -69,7 +80,6 @@ public class MembershipServiceImpl implements MembershipService {
                             user.getUsername(),
                             membershipEntry.getMemberSince(),
                             membershipEntry.isHasPaidMembershipFee(),
-                            membershipEntry.getMonthlyTransactionReceiptPath(),
                             user.isEnabled(),
                             membershipEntry.isApproved()
                     );
@@ -91,9 +101,33 @@ public class MembershipServiceImpl implements MembershipService {
                 membershipEntry.getUser().getEmail(),
                 membershipEntry.getMemberSince(),
                 membershipEntry.isHasPaidMembershipFee(),
-                membershipEntry.getMonthlyTransactionReceiptPath(),
                 membershipEntry.isApproved()
         );
+    }
+
+    @Override
+    public List<MonthlyTransactionDto> listCurrentUserTransactions() {
+        User currentUser = userService.getCurrentUser();
+        return monthlyTransactionListToMonthlyTransactionDtoList(currentUser.getMembershipEntry().getMonthlyTransactions());
+    }
+
+    private List<MonthlyTransactionDto> monthlyTransactionListToMonthlyTransactionDtoList(List<MonthlyTransaction> monthlyTransactions) {
+        return monthlyTransactions
+                .stream()
+                .map(monthlyTransaction -> new MonthlyTransactionDto(monthlyTransaction.getMonthlyTransactionReceiptMonth(), monthlyTransaction.getMonthlyTransactionReceiptPath()))
+                .sorted(Comparator.comparing(MonthlyTransactionDto::getYearMonth).reversed())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public byte[] downloadCurrentUserReceipt(String receiptPath) {
+        try {
+            String baseDir = receiptsBaseDirectory + "user_" + userService.getCurrentUserId() + "/";
+            String targetPath = baseDir + receiptPath;
+            return Files.readAllBytes(Path.of(targetPath));
+        } catch (IOException e) {
+            throw new MyException("Could not download receipt", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
 }

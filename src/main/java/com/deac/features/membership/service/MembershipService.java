@@ -1,6 +1,7 @@
 package com.deac.features.membership.service;
 
 import com.deac.features.membership.dto.MembershipEntryInfoDto;
+import com.deac.features.membership.dto.MonthlyTransactionDto;
 import com.deac.features.membership.dto.ProfileDto;
 
 import java.util.List;
@@ -19,4 +20,7 @@ public interface MembershipService {
 
     ProfileDto getProfileData();
 
+    List<MonthlyTransactionDto> listCurrentUserTransactions();
+
+    byte[] downloadCurrentUserReceipt(String receiptPath);
 }
