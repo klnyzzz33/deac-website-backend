@@ -10,17 +10,21 @@ import com.deac.features.membership.persistence.repository.MembershipRepository;
 import com.deac.features.membership.service.MembershipService;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -128,6 +132,24 @@ public class MembershipServiceImpl implements MembershipService {
         } catch (IOException e) {
             throw new MyException("Could not download receipt", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    @Scheduled(fixedDelay = 2592000000L)
+    @Transactional
+    public void deleteExpiredRefreshTokens() {
+        List<MembershipEntry> membershipEntries = membershipRepository.findAll()
+                .stream()
+                .peek(membershipEntry -> {
+                    List<MonthlyTransaction> originalMonthlyTransactions = membershipEntry.getMonthlyTransactions();
+                    List<MonthlyTransaction> monthlyTransactions = originalMonthlyTransactions
+                            .stream()
+                            .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptMonth().isAfter(YearMonth.now().minusYears(1L)))
+                            .collect(Collectors.toList());
+                    originalMonthlyTransactions.clear();
+                    originalMonthlyTransactions.addAll(monthlyTransactions);
+                })
+                .collect(Collectors.toList());
+        membershipRepository.saveAll(membershipEntries);
     }
 
 }

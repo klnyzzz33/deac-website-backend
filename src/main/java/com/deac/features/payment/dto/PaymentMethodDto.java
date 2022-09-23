@@ -19,4 +19,6 @@ public class PaymentMethodDto {
 
     private String brand;
 
+    private boolean defaultCard;
+
 }

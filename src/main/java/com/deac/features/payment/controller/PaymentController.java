@@ -31,6 +31,21 @@ public class PaymentController {
         return paymentService.makePayment(paymentConfirmDto);
     }
 
+    @PostMapping("/api/payment/saved/confirm")
+    public PaymentStatusDto makePaymentWithSavedPaymentMethod(@RequestBody String paymentMethodId) {
+        return paymentService.makePaymentWithSavedPaymentMethod(paymentMethodId);
+    }
+
+    @PostMapping("/api/payment/saved/default")
+    public ResponseMessage setDefaultPaymentMethod(@RequestBody String paymentMethodId) {
+        return new ResponseMessage(paymentService.setDefaultPaymentMethod(paymentMethodId));
+    }
+
+    @PostMapping("/api/payment/saved/remove")
+    public ResponseMessage removePaymentMethod(@RequestBody String paymentMethodId) {
+        return new ResponseMessage(paymentService.removePaymentMethod(paymentMethodId));
+    }
+
     @PostMapping("/api/payment/confirm_after_authenticate")
     public PaymentStatusDto makePaymentAfterAuthentication(@RequestBody String paymentIntentId) {
         return paymentService.makePaymentAfterAuthentication(paymentIntentId);

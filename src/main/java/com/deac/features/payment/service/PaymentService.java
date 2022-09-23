@@ -30,9 +30,8 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -63,21 +62,34 @@ public class PaymentService {
             if (customer.getDeleted() == null) {
                 CustomerListPaymentMethodsParams customerListPaymentMethodsParams = CustomerListPaymentMethodsParams.builder()
                         .setType(CustomerListPaymentMethodsParams.Type.CARD)
+                        .setLimit(10L)
                         .build();
                 PaymentMethodCollection paymentMethodCollection = customer.listPaymentMethods(customerListPaymentMethodsParams);
                 paymentMethods = paymentMethodCollection.getData();
+            } else {
+                throw new MyException("Customer was deleted", HttpStatus.INTERNAL_SERVER_ERROR);
             }
         } catch (StripeException ignored) {
         }
+        PaymentMethod defaultPaymentMethod = null;
+        Optional<PaymentMethod> latestAddedPaymentMethodOptional = paymentMethods
+                .stream()
+                .max(Comparator.comparing(paymentMethod -> Long.valueOf(paymentMethod.getMetadata().get("lastUsed"))));
+        if (latestAddedPaymentMethodOptional.isPresent()) {
+            defaultPaymentMethod = latestAddedPaymentMethodOptional.get();
+        }
+        PaymentMethod finalDefaultPaymentMethod = defaultPaymentMethod;
         return paymentMethods.stream()
                 .map(paymentMethod -> {
                     PaymentMethod.Card card = paymentMethod.getCard();
+                    boolean isDefault = paymentMethod.equals(finalDefaultPaymentMethod);
                     return new PaymentMethodDto(
                             paymentMethod.getId(),
                             card.getLast4(),
                             card.getExpMonth(),
                             card.getExpYear(),
-                            card.getBrand()
+                            card.getBrand(),
+                            isDefault
                     );
                 })
                 .collect(Collectors.toList());
@@ -100,6 +112,8 @@ public class PaymentService {
                     if (customer.getDeleted() == null) {
                         createParams.setCustomer(customer.getId());
                         createParams.setSetupFutureUsage(PaymentIntentCreateParams.SetupFutureUsage.ON_SESSION);
+                    } else {
+                        throw new MyException("Customer was deleted", HttpStatus.INTERNAL_SERVER_ERROR);
                     }
                 } catch (StripeException ignored) {
                 }
@@ -108,6 +122,63 @@ public class PaymentService {
             return evaluatePaymentStatus(paymentIntent);
         } catch (StripeException e) {
             throw new MyException(e.getUserMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public PaymentStatusDto makePaymentWithSavedPaymentMethod(String paymentMethodId) {
+        try {
+            PaymentMethod savedPaymentMethod = PaymentMethod.retrieve(paymentMethodId);
+            savedPaymentMethod.getMetadata().put("lastUsed", Long.valueOf(new Date().getTime()).toString());
+            PaymentMethodUpdateParams paymentMethodUpdateParams = PaymentMethodUpdateParams.builder()
+                    .setMetadata(savedPaymentMethod.getMetadata())
+                    .build();
+            savedPaymentMethod.update(paymentMethodUpdateParams);
+            PaymentIntentCreateParams.Builder createParams = PaymentIntentCreateParams.builder()
+                    .setAmount(amount)
+                    .setCurrency(currency)
+                    .setReceiptEmail(userService.getCurrentUser().getEmail())
+                    .setPaymentMethod(paymentMethodId)
+                    .setConfirmationMethod(PaymentIntentCreateParams.ConfirmationMethod.MANUAL)
+                    .setConfirm(true);
+            String customerId = userService.getCurrentUser().getMembershipEntry().getCustomerId();
+            try {
+                Customer customer = Customer.retrieve(customerId);
+                if (customer.getDeleted() == null) {
+                    createParams.setCustomer(customer.getId());
+                } else {
+                    throw new MyException("Customer was deleted", HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            } catch (StripeException e) {
+                throw new MyException(e.getUserMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+            PaymentIntent paymentIntent = PaymentIntent.create(createParams.build());
+            return evaluatePaymentStatus(paymentIntent);
+        } catch (StripeException e) {
+            throw new MyException(e.getUserMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public String setDefaultPaymentMethod(String paymentMethodId) {
+        try {
+            PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
+            paymentMethod.getMetadata().put("lastUsed", Long.valueOf(new Date().getTime()).toString());
+            PaymentMethodUpdateParams paymentMethodUpdateParams = PaymentMethodUpdateParams.builder()
+                    .setMetadata(paymentMethod.getMetadata())
+                    .build();
+            paymentMethod.update(paymentMethodUpdateParams);
+            return "Successfully set default payment method";
+        } catch (StripeException e) {
+            throw new MyException("Could not set default payment method", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public String removePaymentMethod(String paymentMethodId) {
+        try {
+            PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
+            paymentMethod.detach();
+            return "Successfully removed payment method";
+        } catch (StripeException e) {
+            throw new MyException("Could not remove payment method", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
