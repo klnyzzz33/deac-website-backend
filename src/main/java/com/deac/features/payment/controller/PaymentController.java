@@ -1,9 +1,6 @@
 package com.deac.features.payment.controller;
 
-import com.deac.features.payment.dto.PaymentConfirmDto;
-import com.deac.features.payment.dto.PaymentMethodDto;
-import com.deac.features.payment.dto.PaymentReceiptDto;
-import com.deac.features.payment.dto.PaymentStatusDto;
+import com.deac.features.payment.dto.*;
 import com.deac.features.payment.service.PaymentService;
 import com.deac.response.ResponseMessage;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +18,11 @@ public class PaymentController {
         this.paymentService = paymentService;
     }
 
+    @PostMapping("/api/payment/checkout_info")
+    public CheckoutInfoDto getCheckoutInfo() {
+        return paymentService.listCheckoutInfo();
+    }
+
     @PostMapping("/api/payment/list_methods")
     public List<PaymentMethodDto> listPaymentMethods() {
         return paymentService.listPaymentMethods();
@@ -32,8 +34,8 @@ public class PaymentController {
     }
 
     @PostMapping("/api/payment/saved/confirm")
-    public PaymentStatusDto makePaymentWithSavedPaymentMethod(@RequestBody String paymentMethodId) {
-        return paymentService.makePaymentWithSavedPaymentMethod(paymentMethodId);
+    public PaymentStatusDto makePaymentWithSavedPaymentMethod(@RequestBody PaymentConfirmDto paymentConfirmDto) {
+        return paymentService.makePaymentWithSavedPaymentMethod(paymentConfirmDto);
     }
 
     @PostMapping("/api/payment/saved/default")

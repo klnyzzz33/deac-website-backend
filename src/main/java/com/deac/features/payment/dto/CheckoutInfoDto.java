@@ -9,12 +9,10 @@ import java.util.List;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public class PaymentConfirmDto {
+public class CheckoutInfoDto {
 
-    private List<CheckoutItemDto> items;
+   private List<CheckoutItemDto> items;
 
-    private String paymentMethodId;
-
-    private boolean saveCard;
+    private String currency;
 
 }

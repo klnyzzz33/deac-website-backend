@@ -3,10 +3,7 @@ package com.deac.features.payment.service;
 import com.deac.exception.MyException;
 import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.membership.persistence.entity.MonthlyTransaction;
-import com.deac.features.payment.dto.PaymentConfirmDto;
-import com.deac.features.payment.dto.PaymentMethodDto;
-import com.deac.features.payment.dto.PaymentReceiptDto;
-import com.deac.features.payment.dto.PaymentStatusDto;
+import com.deac.features.payment.dto.*;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import com.stripe.Stripe;
@@ -34,6 +31,7 @@ import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("DuplicatedCode")
 @Service
 public class PaymentService {
 
@@ -51,6 +49,30 @@ public class PaymentService {
         amount = Objects.requireNonNull(environment.getProperty("stripe.membership.amount", Long.class));
         currency = Objects.requireNonNull(environment.getProperty("stripe.membership.currency", String.class));
         receiptsBaseDirectory = Objects.requireNonNull(environment.getProperty("file.receipts.rootdir", String.class));
+    }
+
+    public CheckoutInfoDto listCheckoutInfo() {
+        MembershipEntry currentUserMembershipEntry = checkIfMembershipAlreadyPaid();
+        boolean isHuf = "huf".equals(currency);
+        List<CheckoutItemDto> items;
+        if (isHuf) {
+            items = currentUserMembershipEntry.getMonthlyTransactions().values()
+                    .stream()
+                    .filter(monthlyTransaction -> YearMonth.now().minusMonths(3L).isBefore(monthlyTransaction.getMonthlyTransactionReceiptMonth()))
+                    .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
+                    .map(monthlyTransaction -> new CheckoutItemDto(monthlyTransaction.getMonthlyTransactionReceiptMonth(), amount / 100))
+                    .sorted(Comparator.comparing(CheckoutItemDto::getMonthlyTransactionReceiptMonth).reversed())
+                    .collect(Collectors.toList());
+        } else {
+            items = currentUserMembershipEntry.getMonthlyTransactions().values()
+                    .stream()
+                    .filter(monthlyTransaction -> YearMonth.now().minusMonths(3L).isBefore(monthlyTransaction.getMonthlyTransactionReceiptMonth()))
+                    .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
+                    .map(monthlyTransaction -> new CheckoutItemDto(monthlyTransaction.getMonthlyTransactionReceiptMonth(), amount))
+                    .sorted(Comparator.comparing(CheckoutItemDto::getMonthlyTransactionReceiptMonth).reversed())
+                    .collect(Collectors.toList());
+        }
+        return new CheckoutInfoDto(items, currency);
     }
 
     public List<PaymentMethodDto> listPaymentMethods() {
@@ -97,15 +119,26 @@ public class PaymentService {
 
     public PaymentStatusDto makePayment(PaymentConfirmDto paymentConfirmDto) {
         try {
+            MembershipEntry currentUserMembershipEntry = checkIfMembershipAlreadyPaid();
+            long totalAmount = 0;
+            Map<String, String> metaData = new HashMap<>();
+            for (CheckoutItemDto item : paymentConfirmDto.getItems()) {
+                totalAmount += item.getAmount();
+                metaData.put(item.getMonthlyTransactionReceiptMonth().toString(), item.getAmount().toString());
+            }
+            if ("huf".equals(currency)) {
+                totalAmount *= 100;
+            }
             PaymentIntentCreateParams.Builder createParams = PaymentIntentCreateParams.builder()
-                    .setAmount(amount)
+                    .setAmount(totalAmount)
                     .setCurrency(currency)
+                    .putAllMetadata(metaData)
                     .setReceiptEmail(userService.getCurrentUser().getEmail())
                     .setPaymentMethod(paymentConfirmDto.getPaymentMethodId())
                     .setConfirmationMethod(PaymentIntentCreateParams.ConfirmationMethod.MANUAL)
                     .setConfirm(true);
             if (paymentConfirmDto.isSaveCard()) {
-                String customerId = userService.getCurrentUser().getMembershipEntry().getCustomerId();
+                String customerId = currentUserMembershipEntry.getCustomerId();
                 Customer customer;
                 try {
                     customer = Customer.retrieve(customerId);
@@ -125,22 +158,33 @@ public class PaymentService {
         }
     }
 
-    public PaymentStatusDto makePaymentWithSavedPaymentMethod(String paymentMethodId) {
+    public PaymentStatusDto makePaymentWithSavedPaymentMethod(PaymentConfirmDto paymentConfirmDto) {
         try {
-            PaymentMethod savedPaymentMethod = PaymentMethod.retrieve(paymentMethodId);
+            MembershipEntry currentUserMembershipEntry = checkIfMembershipAlreadyPaid();
+            long totalAmount = 0;
+            Map<String, String> metaData = new HashMap<>();
+            for (CheckoutItemDto item : paymentConfirmDto.getItems()) {
+                totalAmount += item.getAmount();
+                metaData.put(item.getMonthlyTransactionReceiptMonth().toString(), item.getAmount().toString());
+            }
+            if ("huf".equals(currency)) {
+                totalAmount *= 100;
+            }
+            PaymentMethod savedPaymentMethod = PaymentMethod.retrieve(paymentConfirmDto.getPaymentMethodId());
             savedPaymentMethod.getMetadata().put("lastUsed", Long.valueOf(new Date().getTime()).toString());
             PaymentMethodUpdateParams paymentMethodUpdateParams = PaymentMethodUpdateParams.builder()
                     .setMetadata(savedPaymentMethod.getMetadata())
                     .build();
             savedPaymentMethod.update(paymentMethodUpdateParams);
             PaymentIntentCreateParams.Builder createParams = PaymentIntentCreateParams.builder()
-                    .setAmount(amount)
+                    .setAmount(totalAmount)
                     .setCurrency(currency)
+                    .putAllMetadata(metaData)
                     .setReceiptEmail(userService.getCurrentUser().getEmail())
-                    .setPaymentMethod(paymentMethodId)
+                    .setPaymentMethod(paymentConfirmDto.getPaymentMethodId())
                     .setConfirmationMethod(PaymentIntentCreateParams.ConfirmationMethod.MANUAL)
                     .setConfirm(true);
-            String customerId = userService.getCurrentUser().getMembershipEntry().getCustomerId();
+            String customerId = currentUserMembershipEntry.getCustomerId();
             try {
                 Customer customer = Customer.retrieve(customerId);
                 if (customer.getDeleted() == null) {
@@ -155,30 +199,6 @@ public class PaymentService {
             return evaluatePaymentStatus(paymentIntent);
         } catch (StripeException e) {
             throw new MyException(e.getUserMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    public String setDefaultPaymentMethod(String paymentMethodId) {
-        try {
-            PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
-            paymentMethod.getMetadata().put("lastUsed", Long.valueOf(new Date().getTime()).toString());
-            PaymentMethodUpdateParams paymentMethodUpdateParams = PaymentMethodUpdateParams.builder()
-                    .setMetadata(paymentMethod.getMetadata())
-                    .build();
-            paymentMethod.update(paymentMethodUpdateParams);
-            return "Successfully set default payment method";
-        } catch (StripeException e) {
-            throw new MyException("Could not set default payment method", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    public String removePaymentMethod(String paymentMethodId) {
-        try {
-            PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
-            paymentMethod.detach();
-            return "Successfully removed payment method";
-        } catch (StripeException e) {
-            throw new MyException("Could not remove payment method", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -211,24 +231,71 @@ public class PaymentService {
         return paymentStatusDto;
     }
 
+    private MembershipEntry checkIfMembershipAlreadyPaid() {
+        User currentUser = userService.getCurrentUser();
+        MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
+        List<MonthlyTransaction> monthlyTransactions = currentUserMembershipEntry.getMonthlyTransactions().values()
+                .stream()
+                .filter(monthlyTransaction -> YearMonth.now().minusMonths(3L).isBefore(monthlyTransaction.getMonthlyTransactionReceiptMonth()))
+                .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
+                .collect(Collectors.toList());
+        if (monthlyTransactions.isEmpty()) {
+            throw new MyException("Monthly membership fee already paid", HttpStatus.BAD_REQUEST);
+        }
+        return currentUserMembershipEntry;
+    }
+
+    public String setDefaultPaymentMethod(String paymentMethodId) {
+        try {
+            PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
+            paymentMethod.getMetadata().put("lastUsed", Long.valueOf(new Date().getTime()).toString());
+            PaymentMethodUpdateParams paymentMethodUpdateParams = PaymentMethodUpdateParams.builder()
+                    .setMetadata(paymentMethod.getMetadata())
+                    .build();
+            paymentMethod.update(paymentMethodUpdateParams);
+            return "Successfully set default payment method";
+        } catch (StripeException e) {
+            throw new MyException("Could not set default payment method", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public String removePaymentMethod(String paymentMethodId) {
+        try {
+            PaymentMethod paymentMethod = PaymentMethod.retrieve(paymentMethodId);
+            paymentMethod.detach();
+            return "Successfully removed payment method";
+        } catch (StripeException e) {
+            throw new MyException("Could not remove payment method", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     public String savePayment(PaymentReceiptDto paymentReceiptDto) {
         User currentUser = userService.getCurrentUser();
         MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
-        currentUserMembershipEntry.setHasPaidMembershipFee(true);
-        currentUserMembershipEntry.setApproved(true);
+        Map<String, MonthlyTransaction> monthlyTransactions = currentUserMembershipEntry.getMonthlyTransactions();
         try {
-            currentUserMembershipEntry.getMonthlyTransactions().add(
-                    new MonthlyTransaction(YearMonth.now(), generatePaymentReceipt(paymentReceiptDto, currentUser))
-            );
-        } catch (Exception ignored) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
+            if (!monthlyTransactions.containsKey(YearMonth.now().format(formatter))) {
+                monthlyTransactions.put(YearMonth.now().format(formatter), new MonthlyTransaction(YearMonth.now(), null));
+            }
+            PaymentIntent paymentIntent = PaymentIntent.retrieve(paymentReceiptDto.getPaymentIntentId());
+            Map<String, String> items = paymentIntent.getMetadata();
+            String monthlyTransactionReceiptPath = generatePaymentReceipt(paymentReceiptDto, items, currentUser);
+            for (Map.Entry<String, String> itemEntry : items.entrySet()) {
+                String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
+                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(monthlyTransactionReceiptPath);
+            }
+        } catch (Exception e) {
+            throw new MyException("Could not save payment", HttpStatus.INTERNAL_SERVER_ERROR);
         }
         currentUser.setMembershipEntry(currentUserMembershipEntry);
+        currentUserMembershipEntry.setHasPaidMembershipFee(true);
+        currentUserMembershipEntry.setApproved(true);
         userService.saveUser(currentUser);
         return "Payment successfully saved";
     }
 
-    @SuppressWarnings("DuplicatedCode")
-    private String generatePaymentReceipt(PaymentReceiptDto paymentReceiptDto, User currentUser) {
+    private String generatePaymentReceipt(PaymentReceiptDto paymentReceiptDto, Map<String, String> items, User currentUser) {
         try (PDDocument pdf = new PDDocument()) {
             PDPage page = new PDPage();
             pdf.addPage(page);
@@ -371,7 +438,10 @@ public class PaymentService {
                         fontBold.getStringWidth("Tranzakció azonosító:") / 1000 * 13,
                         Math.max(
                                 fontBold.getStringWidth("Fizetési mód:") / 1000 * 13,
-                                fontBold.getStringWidth("Összeg:") / 1000 * 13
+                                Math.max(
+                                        fontBold.getStringWidth("Összeg:") / 1000 * 13,
+                                        20 + fontNormal.getStringWidth("____.__. havi tagdíj") / 1000 * 13
+                                )
                         )
                 );
                 currentLineHeightPosition = currentLineHeightPosition - textHeight - 15;
@@ -411,7 +481,40 @@ public class PaymentService {
 
                 contentStream.beginText();
                 contentStream.setFont(fontBold, 13);
-                text = "Összeg:";
+                text = "Termékek:";
+                currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+                contentStream.showText(text);
+                contentStream.endText();
+
+                for (Map.Entry<String, String> itemEntry : items.entrySet()) {
+                    String productName = YearMonth.parse(itemEntry.getKey()).format(DateTimeFormatter.ofPattern("yyyy.MM."));
+                    String productPrice = itemEntry.getValue();
+
+                    contentStream.beginText();
+                    contentStream.setFont(fontNormal, 13);
+                    text = productName + " havi tagdíj";
+                    currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+                    contentStream.newLineAtOffset(margin + 20, currentLineHeightPosition);
+                    textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
+                    contentStream.showText(text);
+                    contentStream.endText();
+
+                    contentStream.beginText();
+                    contentStream.setFont(fontNormal, 13);
+                    if ("huf".equals(currency)) {
+                        text = productPrice + ".00 Ft";
+                    } else {
+                        text = productPrice + ".00";
+                    }
+                    contentStream.newLineAtOffset(margin + maxWidth + 20, currentLineHeightPosition);
+                    contentStream.showText(text);
+                    contentStream.endText();
+                }
+
+                contentStream.beginText();
+                contentStream.setFont(fontBold, 13);
+                text = "Összesen:";
                 currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
                 contentStream.newLineAtOffset(margin, currentLineHeightPosition);
                 contentStream.showText(text);
@@ -455,7 +558,6 @@ public class PaymentService {
                 contentStream.showText(text);
                 contentStream.endText();
             } catch (IOException e) {
-                e.printStackTrace();
                 throw new MyException("Could not generate receipt", HttpStatus.INTERNAL_SERVER_ERROR);
             }
             String baseDir = receiptsBaseDirectory + "user_" + currentUser.getId() + "/";

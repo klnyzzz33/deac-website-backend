@@ -5,8 +5,11 @@ import lombok.*;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.persistence.*;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
-import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -33,7 +36,7 @@ public class MembershipEntry {
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
-    private List<MonthlyTransaction> monthlyTransactions = List.of();
+    private Map<String, MonthlyTransaction> monthlyTransactions = Map.of(YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy.MM")), new MonthlyTransaction(YearMonth.now(), null));
 
     @Column(nullable = false)
     private boolean approved = false;

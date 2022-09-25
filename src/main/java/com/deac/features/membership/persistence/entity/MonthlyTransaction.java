@@ -22,7 +22,6 @@ public class MonthlyTransaction {
     @Convert(converter = YearMonthDateAttributeConverter.class)
     private YearMonth monthlyTransactionReceiptMonth;
 
-    @Column(nullable = false)
     private String monthlyTransactionReceiptPath;
 
     public MonthlyTransaction(YearMonth monthlyTransactionReceiptMonth, String monthlyTransactionReceiptPath) {

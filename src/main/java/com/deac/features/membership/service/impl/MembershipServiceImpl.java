@@ -10,7 +10,6 @@ import com.deac.features.membership.persistence.repository.MembershipRepository;
 import com.deac.features.membership.service.MembershipService;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
-import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.data.domain.PageRequest;
@@ -25,9 +24,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.YearMonth;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -98,6 +96,15 @@ public class MembershipServiceImpl implements MembershipService {
 
     @Override
     public ProfileDto getProfileData() {
+        /*MembershipEntry entry = userService.getCurrentUser().getMembershipEntry();
+        Map<String, MonthlyTransaction> monthlyTransactions = entry.getMonthlyTransactions();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
+        monthlyTransactions.put(YearMonth.now().minusMonths(1L).format(formatter), new MonthlyTransaction(YearMonth.now().minusMonths(1L), null));
+        monthlyTransactions.put(YearMonth.now().minusMonths(2L).format(formatter), new MonthlyTransaction(YearMonth.now().minusMonths(2L), null));
+        monthlyTransactions.put(YearMonth.now().minusMonths(3L).format(formatter), new MonthlyTransaction(YearMonth.now().minusMonths(3L), null));
+        membershipRepository.save(entry);*/
+
+
         String username = userService.getCurrentUsername();
         MembershipEntry membershipEntry = membershipRepository.findByUsername(username).orElseThrow(() -> new MyException("Membership does not exist", HttpStatus.BAD_REQUEST));
         return new ProfileDto(
@@ -112,14 +119,15 @@ public class MembershipServiceImpl implements MembershipService {
     @Override
     public List<MonthlyTransactionDto> listCurrentUserTransactions() {
         User currentUser = userService.getCurrentUser();
-        return monthlyTransactionListToMonthlyTransactionDtoList(currentUser.getMembershipEntry().getMonthlyTransactions());
+        return monthlyTransactionListToMonthlyTransactionDtoList(currentUser.getMembershipEntry().getMonthlyTransactions().values());
     }
 
-    private List<MonthlyTransactionDto> monthlyTransactionListToMonthlyTransactionDtoList(List<MonthlyTransaction> monthlyTransactions) {
+    private List<MonthlyTransactionDto> monthlyTransactionListToMonthlyTransactionDtoList(Collection<MonthlyTransaction> monthlyTransactions) {
         return monthlyTransactions
                 .stream()
                 .map(monthlyTransaction -> new MonthlyTransactionDto(monthlyTransaction.getMonthlyTransactionReceiptMonth(), monthlyTransaction.getMonthlyTransactionReceiptPath()))
                 .sorted(Comparator.comparing(MonthlyTransactionDto::getYearMonth).reversed())
+                .limit(12L)
                 .collect(Collectors.toList());
     }
 
@@ -134,13 +142,13 @@ public class MembershipServiceImpl implements MembershipService {
         }
     }
 
-    @Scheduled(fixedDelay = 2592000000L)
+    @Scheduled(cron = "0 0 0 1 1/1 *")
     @Transactional
     public void deleteExpiredRefreshTokens() {
         List<MembershipEntry> membershipEntries = membershipRepository.findAll()
                 .stream()
                 .peek(membershipEntry -> {
-                    List<MonthlyTransaction> originalMonthlyTransactions = membershipEntry.getMonthlyTransactions();
+                    Collection<MonthlyTransaction> originalMonthlyTransactions = membershipEntry.getMonthlyTransactions().values();
                     List<MonthlyTransaction> monthlyTransactions = originalMonthlyTransactions
                             .stream()
                             .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptMonth().isAfter(YearMonth.now().minusYears(1L)))
