@@ -4,7 +4,6 @@ import com.deac.features.membership.persistence.entity.MembershipEntry;
 import lombok.*;
 
 import javax.persistence.*;
-import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 import java.util.List;
 
@@ -45,7 +44,7 @@ public class User {
     @Column(nullable = false)
     private boolean isEnabled;
 
-    @OneToOne(cascade = CascadeType.ALL)
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "membershipentry_id")
     @ToString.Exclude
     private MembershipEntry membershipEntry;
@@ -59,7 +58,6 @@ public class User {
         this.roles = roles;
         this.isVerified = false;
         this.isEnabled = false;
-        this.membershipEntry = null;
     }
 
 }

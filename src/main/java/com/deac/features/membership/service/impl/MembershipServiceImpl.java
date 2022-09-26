@@ -8,6 +8,7 @@ import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.membership.persistence.entity.MonthlyTransaction;
 import com.deac.features.membership.persistence.repository.MembershipRepository;
 import com.deac.features.membership.service.MembershipService;
+import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,10 +107,11 @@ public class MembershipServiceImpl implements MembershipService {
         membershipRepository.save(entry);*/
 
 
-        String username = userService.getCurrentUsername();
-        MembershipEntry membershipEntry = membershipRepository.findByUsername(username).orElseThrow(() -> new MyException("Membership does not exist", HttpStatus.BAD_REQUEST));
+        User user = userService.getCurrentUser();
+        MembershipEntry membershipEntry = user.getMembershipEntry();
         return new ProfileDto(
-                username,
+                user.getSurname() + user.getLastname(),
+                user.getUsername(),
                 membershipEntry.getUser().getEmail(),
                 membershipEntry.getMemberSince(),
                 membershipEntry.isHasPaidMembershipFee(),
@@ -142,19 +145,53 @@ public class MembershipServiceImpl implements MembershipService {
         }
     }
 
-    @Scheduled(cron = "0 0 0 1 1/1 *")
+    @PostConstruct
+    public void validateMonthlyTransactionsOnStartup() {
+        doValidate(true);
+    }
+
+    @Scheduled(cron = "0 0 0 1 * *")
+    public void validateMonthlyTransactions() {
+        doValidate(false);
+    }
+
     @Transactional
-    public void deleteExpiredRefreshTokens() {
+    public void doValidate(boolean onStartup) {
         List<MembershipEntry> membershipEntries = membershipRepository.findAll()
                 .stream()
+                .filter(membershipEntry -> !membershipEntry.getUser().getRoles().contains(Role.ADMIN))
                 .peek(membershipEntry -> {
-                    Collection<MonthlyTransaction> originalMonthlyTransactions = membershipEntry.getMonthlyTransactions().values();
-                    List<MonthlyTransaction> monthlyTransactions = originalMonthlyTransactions
-                            .stream()
-                            .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptMonth().isAfter(YearMonth.now().minusYears(1L)))
-                            .collect(Collectors.toList());
-                    originalMonthlyTransactions.clear();
-                    originalMonthlyTransactions.addAll(monthlyTransactions);
+                    if (!onStartup) {
+                        membershipEntry.setHasPaidMembershipFee(false);
+                        membershipEntry.setApproved(false);
+                    }
+                    if (membershipEntry.getUser().isEnabled()) {
+                        Map<String, MonthlyTransaction> originalMonthlyTransactions = membershipEntry.getMonthlyTransactions();
+                        long unpaidMonths = originalMonthlyTransactions.entrySet()
+                                .stream()
+                                .filter(entry -> !YearMonth.now().equals(entry.getValue().getMonthlyTransactionReceiptMonth()))
+                                .filter(entry -> entry.getValue().getMonthlyTransactionReceiptPath() == null)
+                                .count();
+                        if (unpaidMonths >= 3L) {
+                            if (!onStartup) {
+                                userService.setEnabled(membershipEntry.getUser().getUsername(), false);
+                            }
+                        } else {
+                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
+                            if (!originalMonthlyTransactions.containsKey(YearMonth.now().format(formatter))) {
+                                originalMonthlyTransactions.put(YearMonth.now().format(formatter), new MonthlyTransaction(YearMonth.now(), null));
+                            }
+                            Map<String, MonthlyTransaction> monthlyTransactions = originalMonthlyTransactions.entrySet()
+                                    .stream()
+                                    .filter(entry -> entry.getValue().getMonthlyTransactionReceiptMonth().isAfter(YearMonth.now().minusYears(1L)))
+                                    .collect(Collectors.toMap(
+                                            Map.Entry::getKey,
+                                            Map.Entry::getValue
+                                    ));
+                            originalMonthlyTransactions.clear();
+                            originalMonthlyTransactions.putAll(monthlyTransactions);
+                        }
+                    }
                 })
                 .collect(Collectors.toList());
         membershipRepository.saveAll(membershipEntries);

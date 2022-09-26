@@ -12,6 +12,8 @@ import java.util.List;
 @AllArgsConstructor
 public class ProfileDto {
 
+    private String fullName;
+
     private String username;
 
     private String email;

@@ -58,7 +58,6 @@ public class PaymentService {
         if (isHuf) {
             items = currentUserMembershipEntry.getMonthlyTransactions().values()
                     .stream()
-                    .filter(monthlyTransaction -> YearMonth.now().minusMonths(3L).isBefore(monthlyTransaction.getMonthlyTransactionReceiptMonth()))
                     .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
                     .map(monthlyTransaction -> new CheckoutItemDto(monthlyTransaction.getMonthlyTransactionReceiptMonth(), amount / 100))
                     .sorted(Comparator.comparing(CheckoutItemDto::getMonthlyTransactionReceiptMonth).reversed())
@@ -66,7 +65,6 @@ public class PaymentService {
         } else {
             items = currentUserMembershipEntry.getMonthlyTransactions().values()
                     .stream()
-                    .filter(monthlyTransaction -> YearMonth.now().minusMonths(3L).isBefore(monthlyTransaction.getMonthlyTransactionReceiptMonth()))
                     .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
                     .map(monthlyTransaction -> new CheckoutItemDto(monthlyTransaction.getMonthlyTransactionReceiptMonth(), amount))
                     .sorted(Comparator.comparing(CheckoutItemDto::getMonthlyTransactionReceiptMonth).reversed())
@@ -236,7 +234,6 @@ public class PaymentService {
         MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
         List<MonthlyTransaction> monthlyTransactions = currentUserMembershipEntry.getMonthlyTransactions().values()
                 .stream()
-                .filter(monthlyTransaction -> YearMonth.now().minusMonths(3L).isBefore(monthlyTransaction.getMonthlyTransactionReceiptMonth()))
                 .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
                 .collect(Collectors.toList());
         if (monthlyTransactions.isEmpty()) {
@@ -279,7 +276,9 @@ public class PaymentService {
                 monthlyTransactions.put(YearMonth.now().format(formatter), new MonthlyTransaction(YearMonth.now(), null));
             }
             PaymentIntent paymentIntent = PaymentIntent.retrieve(paymentReceiptDto.getPaymentIntentId());
-            Map<String, String> items = paymentIntent.getMetadata();
+            Comparator<String> comparator = Comparator.comparing(YearMonth::parse);
+            SortedMap<String, String> items = new TreeMap<>(comparator.reversed());
+            items.putAll(paymentIntent.getMetadata());
             String monthlyTransactionReceiptPath = generatePaymentReceipt(paymentReceiptDto, items, currentUser);
             for (Map.Entry<String, String> itemEntry : items.entrySet()) {
                 String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
@@ -295,7 +294,7 @@ public class PaymentService {
         return "Payment successfully saved";
     }
 
-    private String generatePaymentReceipt(PaymentReceiptDto paymentReceiptDto, Map<String, String> items, User currentUser) {
+    private String generatePaymentReceipt(PaymentReceiptDto paymentReceiptDto, SortedMap<String, String> items, User currentUser) {
         try (PDDocument pdf = new PDDocument()) {
             PDPage page = new PDPage();
             pdf.addPage(page);
@@ -496,7 +495,6 @@ public class PaymentService {
                     text = productName + " havi tagdíj";
                     currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
                     contentStream.newLineAtOffset(margin + 20, currentLineHeightPosition);
-                    textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
                     contentStream.showText(text);
                     contentStream.endText();
 

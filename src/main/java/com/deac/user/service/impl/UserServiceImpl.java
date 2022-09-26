@@ -82,6 +82,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), "Admin", "", List.of(Role.ADMIN));
             admin.setVerified(true);
             admin.setEnabled(true);
+            admin.setMembershipEntry(new MembershipEntry(true, Map.of(), true));
             this.userRepository.save(admin);
         }
     }

@@ -9,7 +9,6 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.Map;
-import java.util.Set;
 
 @Entity
 @Getter
@@ -34,7 +33,8 @@ public class MembershipEntry {
     @Column(nullable = false)
     private boolean hasPaidMembershipFee = false;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @MapKeyColumn(length = 128)
     @ToString.Exclude
     private Map<String, MonthlyTransaction> monthlyTransactions = Map.of(YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy.MM")), new MonthlyTransaction(YearMonth.now(), null));
 
@@ -42,5 +42,11 @@ public class MembershipEntry {
     private boolean approved = false;
 
     private String customerId = null;
+
+    public MembershipEntry(boolean hasPaidMembershipFee, Map<String, MonthlyTransaction> monthlyTransactions, boolean approved) {
+        this.hasPaidMembershipFee = hasPaidMembershipFee;
+        this.monthlyTransactions = monthlyTransactions;
+        this.approved = approved;
+    }
 
 }
