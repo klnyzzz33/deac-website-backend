@@ -216,6 +216,15 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
+    public User getUserByUsername(String username) {
+        Optional<User> user = userRepository.findByUsername(username);
+        if (user.isEmpty()) {
+            throw new MyException("User does not exist", HttpStatus.BAD_REQUEST);
+        }
+        return user.get();
+    }
+
+    @Override
     public User getCurrentUser() {
         Optional<User> user = userRepository.findByUsername(getCurrentUsername());
         if (user.isEmpty()) {

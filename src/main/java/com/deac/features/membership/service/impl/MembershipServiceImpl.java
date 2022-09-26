@@ -4,8 +4,9 @@ import com.deac.exception.MyException;
 import com.deac.features.membership.dto.MembershipEntryInfoDto;
 import com.deac.features.membership.dto.MonthlyTransactionDto;
 import com.deac.features.membership.dto.ProfileDto;
+import com.deac.features.membership.dto.UserProfileDto;
 import com.deac.features.membership.persistence.entity.MembershipEntry;
-import com.deac.features.membership.persistence.entity.MonthlyTransaction;
+import com.deac.features.payment.persistence.entity.MonthlyTransaction;
 import com.deac.features.membership.persistence.repository.MembershipRepository;
 import com.deac.features.membership.service.MembershipService;
 import com.deac.user.persistence.entity.Role;
@@ -78,14 +79,19 @@ public class MembershipServiceImpl implements MembershipService {
     private List<MembershipEntryInfoDto> membershipEntryListToMembershipEntryInfoDtoList(List<MembershipEntry> membershipEntries) {
         return membershipEntries
                 .stream()
+                .filter(membershipEntry -> !membershipEntry.getUser().getRoles().contains(Role.ADMIN))
                 .map(membershipEntry -> {
                     User user = membershipEntry.getUser();
+                    boolean hasReceipts = membershipEntry.getMonthlyTransactions().values()
+                            .stream()
+                            .anyMatch(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() != null);
                     return new MembershipEntryInfoDto(
                             user.getUsername(),
                             membershipEntry.getMemberSince(),
                             membershipEntry.isHasPaidMembershipFee(),
                             user.isEnabled(),
-                            membershipEntry.isApproved()
+                            membershipEntry.isApproved(),
+                            hasReceipts
                     );
                 })
                 .collect(Collectors.toList());
@@ -97,7 +103,41 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
-    public ProfileDto getProfileData() {
+    public UserProfileDto getUserProfileData(String username) {
+        User user = userService.getUserByUsername(username);
+        MembershipEntry membershipEntry = user.getMembershipEntry();
+        return new UserProfileDto(
+                user.getSurname() + " " + user.getLastname(),
+                user.getUsername(),
+                membershipEntry.getUser().getEmail(),
+                membershipEntry.getMemberSince(),
+                user.isEnabled(),
+                user.isVerified(),
+                membershipEntry.isHasPaidMembershipFee(),
+                membershipEntry.isApproved()
+        );
+    }
+
+    @Override
+    public List<MonthlyTransactionDto> listUserTransactions(String username) {
+        User user = userService.getUserByUsername(username);
+        return monthlyTransactionListToMonthlyTransactionDtoList(user.getMembershipEntry().getMonthlyTransactions().values());
+    }
+
+    @Override
+    public byte[] downloadUserReceipt(String username, String receiptPath) {
+        try {
+            String baseDir = receiptsBaseDirectory + "user_" + userService.getUserByUsername(username).getId() + "/";
+            String targetPath = baseDir + receiptPath;
+            return Files.readAllBytes(Path.of(targetPath));
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new MyException("Could not download receipt", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public ProfileDto getCurrentUserProfileData() {
         /*MembershipEntry entry = userService.getCurrentUser().getMembershipEntry();
         Map<String, MonthlyTransaction> monthlyTransactions = entry.getMonthlyTransactions();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
@@ -110,7 +150,7 @@ public class MembershipServiceImpl implements MembershipService {
         User user = userService.getCurrentUser();
         MembershipEntry membershipEntry = user.getMembershipEntry();
         return new ProfileDto(
-                user.getSurname() + user.getLastname(),
+                user.getSurname() + " " + user.getLastname(),
                 user.getUsername(),
                 membershipEntry.getUser().getEmail(),
                 membershipEntry.getMemberSince(),

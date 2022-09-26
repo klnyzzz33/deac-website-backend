@@ -1,5 +1,6 @@
-package com.deac.features.membership.persistence.entity;
+package com.deac.features.payment.persistence.entity;
 
+import com.deac.features.payment.persistence.YearMonthDateAttributeConverter;
 import lombok.*;
 
 import javax.persistence.*;

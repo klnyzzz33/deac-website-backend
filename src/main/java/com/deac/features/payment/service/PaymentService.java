@@ -2,7 +2,7 @@ package com.deac.features.payment.service;
 
 import com.deac.exception.MyException;
 import com.deac.features.membership.persistence.entity.MembershipEntry;
-import com.deac.features.membership.persistence.entity.MonthlyTransaction;
+import com.deac.features.payment.persistence.entity.MonthlyTransaction;
 import com.deac.features.payment.dto.*;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;

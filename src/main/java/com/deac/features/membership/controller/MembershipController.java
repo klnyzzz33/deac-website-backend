@@ -1,9 +1,6 @@
 package com.deac.features.membership.controller;
 
-import com.deac.features.membership.dto.MembershipDto;
-import com.deac.features.membership.dto.MembershipEntryInfoDto;
-import com.deac.features.membership.dto.MonthlyTransactionDto;
-import com.deac.features.membership.dto.ProfileDto;
+import com.deac.features.membership.dto.*;
 import com.deac.features.membership.service.MembershipService;
 import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,9 +42,29 @@ public class MembershipController {
         return membershipService.getNumberOfMemberships();
     }
 
+    @PostMapping("/api/admin/memberships/profile")
+    public UserProfileDto getUserProfileData(@RequestBody String username) {
+        return membershipService.getUserProfileData(username);
+    }
+
+    @PostMapping("/api/admin/memberships/profile/transactions/list")
+    public List<MonthlyTransactionDto> listUserTransactions(@RequestBody String username) {
+        return membershipService.listUserTransactions(username);
+    }
+
+    @PostMapping("/api/admin/memberships/profile/transactions/download")
+    public ResponseEntity<byte[]> downloadUserReceipt(@RequestParam(name = "username") String username,
+                                                      @RequestParam(name = "receiptPath") String receiptPath) {
+        byte[] bytes = membershipService.downloadUserReceipt(username, receiptPath);
+        return ResponseEntity.ok()
+                .contentLength(bytes.length)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(bytes);
+    }
+
     @GetMapping("/api/memberships/profile")
-    public ProfileDto getProfileData() {
-        return membershipService.getProfileData();
+    public ProfileDto getCurrentUserProfileData() {
+        return membershipService.getCurrentUserProfileData();
     }
 
     @GetMapping("/api/memberships/profile/transactions/list")

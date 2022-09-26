@@ -27,6 +27,8 @@ public interface UserService {
 
     String getUser(Integer userId);
 
+    User getUserByUsername(String username);
+
     User getCurrentUser();
 
     void setEnabled(String username, boolean isEnabled);

@@ -1,4 +1,4 @@
-package com.deac.features.membership.persistence.entity;
+package com.deac.features.payment.persistence;
 
 import javax.persistence.AttributeConverter;
 import javax.persistence.Converter;

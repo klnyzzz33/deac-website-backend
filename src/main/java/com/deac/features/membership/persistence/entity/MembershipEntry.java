@@ -1,5 +1,6 @@
 package com.deac.features.membership.persistence.entity;
 
+import com.deac.features.payment.persistence.entity.MonthlyTransaction;
 import com.deac.user.persistence.entity.User;
 import lombok.*;
 import org.springframework.format.annotation.DateTimeFormat;

@@ -9,18 +9,22 @@ import java.util.Date;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public class MembershipEntryInfoDto {
+public class UserProfileDto {
+
+    private String fullName;
 
     private String username;
 
+    private String email;
+
     private Date memberSince;
+
+    private boolean enabled;
+
+    private boolean verified;
 
     private boolean hasPaidMembershipFee;
 
-    private boolean isEnabled;
-
     private boolean approved;
-
-    private boolean hasReceipts;
 
 }
