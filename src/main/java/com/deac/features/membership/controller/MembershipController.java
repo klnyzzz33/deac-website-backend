@@ -33,13 +33,14 @@ public class MembershipController {
 
     @GetMapping("/api/admin/memberships/list")
     public List<MembershipEntryInfoDto> listMembershipEntries(@RequestParam(name = "pageNumber") int pageNumber,
-                                                              @RequestParam(name = "entriesPerPage") int entriesPerPage) {
-        return membershipService.listMembershipEntries(pageNumber, entriesPerPage);
+                                                              @RequestParam(name = "entriesPerPage") int entriesPerPage,
+                                                              @RequestParam(name = "filterHasPaid", required = false) Boolean filterHasPaid) {
+        return membershipService.listMembershipEntries(pageNumber, entriesPerPage, filterHasPaid);
     }
 
     @GetMapping("/api/admin/memberships/count")
-    public Long getNumberOfMembershipEntries() {
-        return membershipService.getNumberOfMemberships();
+    public Long getNumberOfMembershipEntries(@RequestParam(name = "filterHasPaid", required = false) Boolean filterHasPaid) {
+        return membershipService.getNumberOfMemberships(filterHasPaid);
     }
 
     @PostMapping("/api/admin/memberships/profile")

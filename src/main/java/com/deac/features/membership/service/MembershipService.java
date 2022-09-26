@@ -15,9 +15,9 @@ public interface MembershipService {
 
     String toggleHasPaidMembershipFee(String username, boolean hasPaidMembershipFee);
 
-    List<MembershipEntryInfoDto> listMembershipEntries(int pageNumber, int pageSize);
+    List<MembershipEntryInfoDto> listMembershipEntries(int pageNumber, int pageSize, Boolean filterHasPaid);
 
-    long getNumberOfMemberships();
+    long getNumberOfMemberships(Boolean filterHasPaid);
 
     UserProfileDto getUserProfileData(String username);
 

@@ -17,4 +17,8 @@ public interface MembershipRepository extends JpaRepository<MembershipEntry, Use
 
     List<MembershipEntry> findBy(Pageable pageable);
 
+    List<MembershipEntry> findByHasPaidMembershipFee(boolean hasPaidMembershipFee, Pageable pageable);
+
+    Long countAllByHasPaidMembershipFee(boolean hasPaidMembershipFee);
+
 }

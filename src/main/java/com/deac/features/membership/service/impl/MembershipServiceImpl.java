@@ -70,9 +70,14 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
-    public List<MembershipEntryInfoDto> listMembershipEntries(int pageNumber, int pageSize) {
-        Pageable sortedByUsername = PageRequest.of(pageNumber - 1, pageSize, Sort.by("user.username"));
-        List<MembershipEntry> membershipEntries = membershipRepository.findBy(sortedByUsername);
+    public List<MembershipEntryInfoDto> listMembershipEntries(int pageNumber, int pageSize, Boolean filterHasPaid) {
+        Pageable pageable = PageRequest.of(pageNumber - 1, pageSize, Sort.by("user.username"));
+        List<MembershipEntry> membershipEntries;
+        if (filterHasPaid == null) {
+            membershipEntries = membershipRepository.findBy(pageable);
+        } else {
+            membershipEntries = membershipRepository.findByHasPaidMembershipFee(filterHasPaid, pageable);
+        }
         return membershipEntryListToMembershipEntryInfoDtoList(membershipEntries);
     }
 
@@ -98,8 +103,12 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
-    public long getNumberOfMemberships() {
-        return membershipRepository.count();
+    public long getNumberOfMemberships(Boolean filterHasPaid) {
+        if (filterHasPaid == null) {
+            return membershipRepository.count();
+        } else {
+            return membershipRepository.countAllByHasPaidMembershipFee(filterHasPaid);
+        }
     }
 
     @Override
