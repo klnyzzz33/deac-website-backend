@@ -9,6 +9,7 @@ import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.payment.persistence.entity.MonthlyTransaction;
 import com.deac.features.membership.persistence.repository.MembershipRepository;
 import com.deac.features.membership.service.MembershipService;
+import com.deac.mail.EmailService;
 import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.PostConstruct;
+import javax.mail.MessagingException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,12 +40,15 @@ public class MembershipServiceImpl implements MembershipService {
 
     private final UserService userService;
 
+    private final EmailService emailService;
+
     private final String receiptsBaseDirectory;
 
     @Autowired
-    public MembershipServiceImpl(MembershipRepository membershipRepository, UserService userService, Environment environment) {
+    public MembershipServiceImpl(MembershipRepository membershipRepository, UserService userService, EmailService emailService, Environment environment) {
         this.membershipRepository = membershipRepository;
         this.userService = userService;
+        this.emailService = emailService;
         receiptsBaseDirectory = Objects.requireNonNull(environment.getProperty("file.receipts.rootdir", String.class));
     }
 
@@ -204,6 +209,11 @@ public class MembershipServiceImpl implements MembershipService {
         doValidate(false);
     }
 
+    @Scheduled(cron = "0 0 0 20 * *")
+    public void monthlyTransactionReminder() {
+        checkCurrentMonthTransactions();
+    }
+
     @Transactional
     public void doValidate(boolean onStartup) {
         List<MembershipEntry> membershipEntries = membershipRepository.findAll()
@@ -244,6 +254,40 @@ public class MembershipServiceImpl implements MembershipService {
                 })
                 .collect(Collectors.toList());
         membershipRepository.saveAll(membershipEntries);
+    }
+
+    @Transactional
+    public void checkCurrentMonthTransactions() {
+        membershipRepository.findAll()
+                .stream()
+                .filter(membershipEntry -> !membershipEntry.getUser().getRoles().contains(Role.ADMIN))
+                .filter(membershipEntry -> !membershipEntry.isHasPaidMembershipFee())
+                .forEach(membershipEntry -> {
+                    Map<String, MonthlyTransaction> monthlyTransactions = membershipEntry.getMonthlyTransactions();
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
+                    Comparator<String> comparator = Comparator.comparing((String s) -> YearMonth.parse(s, formatter));
+                    List<String> unpaidMonths = monthlyTransactions.entrySet()
+                            .stream()
+                            .filter(entry -> entry.getValue().getMonthlyTransactionReceiptPath() == null)
+                            .map(Map.Entry::getKey)
+                            .sorted(comparator.reversed())
+                            .collect(Collectors.toList());
+                    StringBuilder unpaidMonthsString = new StringBuilder();
+                    for (int i = 0; i < unpaidMonths.size(); i++) {
+                        unpaidMonthsString.append(unpaidMonths.get(i));
+                        if (i != unpaidMonths.size() - 1) {
+                            unpaidMonthsString.append(", ");
+                        } else {
+                            unpaidMonthsString.append(".<br>");
+                        }
+                    }
+                    try {
+                        emailService.sendMessage(membershipEntry.getUser().getEmail(),
+                                "Monthly reminder to pay your membership fee",
+                                "<h3>Dear " + membershipEntry.getUser().getSurname() + " " + membershipEntry.getUser().getLastname() + " , this is your monthly automated email to remind you to pay your membership fee. You currently have " + unpaidMonths.size() + " unpaid month(s):<br>" + unpaidMonthsString + "Remember that if you do not pay the given fees for more than 3 months, you will be banned from the site.<br>In case you get banned but you would like to rejoin the site, contact our support.<h3>");
+                    } catch (MessagingException ignored) {
+                    }
+                });
     }
 
 }
