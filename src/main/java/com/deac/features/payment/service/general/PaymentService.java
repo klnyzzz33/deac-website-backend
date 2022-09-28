@@ -5,6 +5,7 @@ import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.payment.dto.CheckoutInfoDto;
 import com.deac.features.payment.dto.CheckoutItemDto;
 import com.deac.features.payment.persistence.entity.MonthlyTransaction;
+import com.deac.mail.EmailService;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import com.stripe.model.PaymentMethod;
@@ -19,6 +20,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import javax.mail.MessagingException;
 import java.awt.*;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -37,6 +39,8 @@ public class PaymentService {
 
     private final UserService userService;
 
+    private final EmailService emailService;
+
     private final Long amount;
 
     private final String currency;
@@ -44,8 +48,9 @@ public class PaymentService {
     private final String receiptsBaseDirectory;
 
     @Autowired
-    public PaymentService(UserService userService, Environment environment) {
+    public PaymentService(UserService userService, EmailService emailService, Environment environment) {
         this.userService = userService;
+        this.emailService = emailService;
         amount = Objects.requireNonNull(environment.getProperty("membership.amount", Long.class));
         currency = Objects.requireNonNull(environment.getProperty("membership.currency", String.class));
         receiptsBaseDirectory = Objects.requireNonNull(environment.getProperty("file.receipts.rootdir", String.class));
@@ -363,6 +368,24 @@ public class PaymentService {
             return filePath;
         } catch (IOException e) {
             throw new MyException("Could not generate receipt", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public void sendPaymentSuccessEmail(User currentUser, List<String> items) {
+        StringBuilder paidMonthsString = new StringBuilder();
+        for (int i = 0; i < items.size(); i++) {
+            paidMonthsString.append(items.get(i));
+            if (i != items.size() - 1) {
+                paidMonthsString.append(", ");
+            } else {
+                paidMonthsString.append(".<br>");
+            }
+        }
+        try {
+            emailService.sendMessage(currentUser.getEmail(),
+                    "Your payment receipt",
+                    "<h3>Dear " + currentUser.getSurname() + " " + currentUser.getLastname() + ", you have successfully paid the membership fees for the following months:<br>" + paidMonthsString + "We've sent your payment receipt as an attachment.<h3>");
+        } catch (MessagingException ignored) {
         }
     }
 

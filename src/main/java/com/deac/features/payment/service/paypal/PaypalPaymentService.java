@@ -24,6 +24,7 @@ import java.net.http.HttpResponse;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class PaypalPaymentService {
@@ -147,10 +148,10 @@ public class PaypalPaymentService {
     }
 
     public String savePayment(String orderId) {
-        User currentUser = userService.getCurrentUser();
-        MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
-        Map<String, MonthlyTransaction> monthlyTransactions = currentUserMembershipEntry.getMonthlyTransactions();
         try {
+            User currentUser = userService.getCurrentUser();
+            MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
+            Map<String, MonthlyTransaction> monthlyTransactions = currentUserMembershipEntry.getMonthlyTransactions();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
             if (!monthlyTransactions.containsKey(YearMonth.now().format(formatter))) {
                 monthlyTransactions.put(YearMonth.now().format(formatter), new MonthlyTransaction(YearMonth.now(), null));
@@ -170,14 +171,15 @@ public class PaypalPaymentService {
                 String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
                 monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(monthlyTransactionReceiptPath);
             }
+            currentUser.setMembershipEntry(currentUserMembershipEntry);
+            currentUserMembershipEntry.setHasPaidMembershipFee(true);
+            currentUserMembershipEntry.setApproved(true);
+            userService.saveUser(currentUser);
+            paymentService.sendPaymentSuccessEmail(currentUser, new ArrayList<>(items.keySet()));
+            return "Payment successfully saved";
         } catch (Exception e) {
             throw new MyException("Could not save payment", HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        currentUser.setMembershipEntry(currentUserMembershipEntry);
-        currentUserMembershipEntry.setHasPaidMembershipFee(true);
-        currentUserMembershipEntry.setApproved(true);
-        userService.saveUser(currentUser);
-        return "Payment successfully saved";
     }
 
     private JSONObject retrieveOrder(String orderId) {
