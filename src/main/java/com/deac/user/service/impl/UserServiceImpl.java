@@ -159,7 +159,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             Customer customer = Customer.create(customerCreateParams);
             user.getMembershipEntry().setCustomerId(customer.getId());
         } catch (StripeException e) {
-            throw new MyException("Could not initialize customer for future payments", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new MyException("Unknown error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
