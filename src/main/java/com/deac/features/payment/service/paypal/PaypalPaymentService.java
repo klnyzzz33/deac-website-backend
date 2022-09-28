@@ -1,9 +1,16 @@
 package com.deac.features.payment.service.paypal;
 
 import com.deac.exception.MyException;
+import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.payment.dto.CheckoutItemDto;
+import com.deac.features.payment.persistence.entity.MonthlyTransaction;
+import com.deac.features.payment.service.general.PaymentService;
+import com.deac.user.persistence.entity.User;
+import com.deac.user.service.UserService;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
@@ -14,10 +21,16 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
 public class PaypalPaymentService {
+
+    private final UserService userService;
+
+    private final PaymentService paymentService;
 
     private final Base64.Encoder encoder;
 
@@ -34,7 +47,9 @@ public class PaypalPaymentService {
     private final String currency;
 
     @Autowired
-    public PaypalPaymentService(Environment environment) {
+    public PaypalPaymentService(UserService userService, PaymentService paymentService, Environment environment) {
+        this.userService = userService;
+        this.paymentService = paymentService;
         this.encoder = Base64.getEncoder();
         this.client = HttpClient.newHttpClient();
         this.gson = new Gson();
@@ -131,8 +146,54 @@ public class PaypalPaymentService {
         }
     }
 
-    public String savePayment() {
-        return null;
+    public String savePayment(String orderId) {
+        User currentUser = userService.getCurrentUser();
+        MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
+        Map<String, MonthlyTransaction> monthlyTransactions = currentUserMembershipEntry.getMonthlyTransactions();
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
+            if (!monthlyTransactions.containsKey(YearMonth.now().format(formatter))) {
+                monthlyTransactions.put(YearMonth.now().format(formatter), new MonthlyTransaction(YearMonth.now(), null));
+            }
+            JSONObject order = retrieveOrder(orderId);
+            JSONObject purchaseUnit = order.getJSONArray("purchase_units").getJSONObject(0);
+            Long totalAmount = Double.valueOf(purchaseUnit.getJSONObject("amount").get("value").toString()).longValue() * 100;
+            Comparator<String> comparator = Comparator.comparing(YearMonth::parse);
+            SortedMap<String, String> items = new TreeMap<>(comparator.reversed());
+            JSONArray purchaseUnitItems = purchaseUnit.getJSONArray("items");
+            for (int i = 0; i < purchaseUnitItems.length(); i++) {
+                JSONObject tmp = purchaseUnitItems.getJSONObject(i);
+                items.put(tmp.get("name").toString(), ((Long) Double.valueOf(tmp.getJSONObject("unit_amount").get("value").toString()).longValue()).toString());
+            }
+            String monthlyTransactionReceiptPath = paymentService.generatePaymentReceipt(order.get("id").toString(), "PayPal", totalAmount, items, currentUser);
+            for (Map.Entry<String, String> itemEntry : items.entrySet()) {
+                String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
+                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(monthlyTransactionReceiptPath);
+            }
+        } catch (Exception e) {
+            throw new MyException("Could not save payment", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        currentUser.setMembershipEntry(currentUserMembershipEntry);
+        currentUserMembershipEntry.setHasPaidMembershipFee(true);
+        currentUserMembershipEntry.setApproved(true);
+        userService.saveUser(currentUser);
+        return "Payment successfully saved";
+    }
+
+    private JSONObject retrieveOrder(String orderId) {
+        try {
+            String accessToken = generateAccessToken();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(String.format("%s/v2/checkout/orders/%s", baseUrl, orderId)))
+                    .method("GET", HttpRequest.BodyPublishers.noBody())
+                    .header("Authorization", String.format("Bearer %s", accessToken))
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            evaluateResponse(response);
+            return new JSONObject(response.body());
+        } catch (IOException | InterruptedException e) {
+            throw new MyException("Could not retrieve payment info", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
 }

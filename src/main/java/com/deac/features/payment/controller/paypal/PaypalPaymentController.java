@@ -2,6 +2,7 @@ package com.deac.features.payment.controller.paypal;
 
 import com.deac.features.payment.dto.CheckoutItemDto;
 import com.deac.features.payment.service.paypal.PaypalPaymentService;
+import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,8 +31,8 @@ public class PaypalPaymentController {
     }
 
     @PostMapping("/api/payment/paypal/save")
-    public Object savePayment() {
-        return paypalPaymentService.savePayment();
+    public ResponseMessage savePayment(@RequestBody String orderId) {
+        return new ResponseMessage(paypalPaymentService.savePayment(orderId));
     }
 
 }

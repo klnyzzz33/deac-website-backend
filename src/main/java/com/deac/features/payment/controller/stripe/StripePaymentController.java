@@ -51,8 +51,8 @@ public class StripePaymentController {
     }
 
     @PostMapping("/api/payment/stripe/save")
-    public ResponseMessage savePayment(@RequestBody PaymentReceiptDto paymentReceiptDto) {
-        return new ResponseMessage(stripePaymentService.savePayment(paymentReceiptDto));
+    public ResponseMessage savePayment(@RequestBody String paymentIntentId) {
+        return new ResponseMessage(stripePaymentService.savePayment(paymentIntentId));
     }
 
 }
