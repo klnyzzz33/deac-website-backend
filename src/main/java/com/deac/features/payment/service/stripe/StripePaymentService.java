@@ -1,9 +1,10 @@
-package com.deac.features.payment.service;
+package com.deac.features.payment.service.stripe;
 
 import com.deac.exception.MyException;
 import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.payment.persistence.entity.MonthlyTransaction;
 import com.deac.features.payment.dto.*;
+import com.deac.features.payment.service.general.PaymentService;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import com.stripe.Stripe;
@@ -15,6 +16,7 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
@@ -33,44 +35,23 @@ import java.util.stream.Collectors;
 
 @SuppressWarnings("DuplicatedCode")
 @Service
-public class PaymentService {
+public class StripePaymentService {
 
     private final UserService userService;
 
-    private final Long amount;
+    private final PaymentService paymentService;
 
     private final String currency;
 
     private final String receiptsBaseDirectory;
 
-    public PaymentService(UserService userService, Environment environment) {
+    @Autowired
+    public StripePaymentService(UserService userService, Environment environment, PaymentService paymentService) {
         this.userService = userService;
+        this.paymentService = paymentService;
         Stripe.apiKey = Objects.requireNonNull(environment.getProperty("stripe.apikey", String.class));
-        amount = Objects.requireNonNull(environment.getProperty("stripe.membership.amount", Long.class));
-        currency = Objects.requireNonNull(environment.getProperty("stripe.membership.currency", String.class));
+        currency = Objects.requireNonNull(environment.getProperty("membership.currency", String.class));
         receiptsBaseDirectory = Objects.requireNonNull(environment.getProperty("file.receipts.rootdir", String.class));
-    }
-
-    public CheckoutInfoDto listCheckoutInfo() {
-        MembershipEntry currentUserMembershipEntry = checkIfMembershipAlreadyPaid();
-        boolean isHuf = "huf".equals(currency);
-        List<CheckoutItemDto> items;
-        if (isHuf) {
-            items = currentUserMembershipEntry.getMonthlyTransactions().values()
-                    .stream()
-                    .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
-                    .map(monthlyTransaction -> new CheckoutItemDto(monthlyTransaction.getMonthlyTransactionReceiptMonth(), amount / 100))
-                    .sorted(Comparator.comparing(CheckoutItemDto::getMonthlyTransactionReceiptMonth).reversed())
-                    .collect(Collectors.toList());
-        } else {
-            items = currentUserMembershipEntry.getMonthlyTransactions().values()
-                    .stream()
-                    .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
-                    .map(monthlyTransaction -> new CheckoutItemDto(monthlyTransaction.getMonthlyTransactionReceiptMonth(), amount))
-                    .sorted(Comparator.comparing(CheckoutItemDto::getMonthlyTransactionReceiptMonth).reversed())
-                    .collect(Collectors.toList());
-        }
-        return new CheckoutInfoDto(items, currency);
     }
 
     public List<PaymentMethodDto> listPaymentMethods() {
@@ -117,7 +98,7 @@ public class PaymentService {
 
     public PaymentStatusDto makePayment(PaymentConfirmDto paymentConfirmDto) {
         try {
-            MembershipEntry currentUserMembershipEntry = checkIfMembershipAlreadyPaid();
+            MembershipEntry currentUserMembershipEntry = paymentService.checkIfMembershipAlreadyPaid();
             long totalAmount = 0;
             Map<String, String> metaData = new HashMap<>();
             for (CheckoutItemDto item : paymentConfirmDto.getItems()) {
@@ -158,7 +139,7 @@ public class PaymentService {
 
     public PaymentStatusDto makePaymentWithSavedPaymentMethod(PaymentConfirmDto paymentConfirmDto) {
         try {
-            MembershipEntry currentUserMembershipEntry = checkIfMembershipAlreadyPaid();
+            MembershipEntry currentUserMembershipEntry = paymentService.checkIfMembershipAlreadyPaid();
             long totalAmount = 0;
             Map<String, String> metaData = new HashMap<>();
             for (CheckoutItemDto item : paymentConfirmDto.getItems()) {
@@ -227,19 +208,6 @@ public class PaymentService {
                 throw new MyException("Unknown error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
         }
         return paymentStatusDto;
-    }
-
-    private MembershipEntry checkIfMembershipAlreadyPaid() {
-        User currentUser = userService.getCurrentUser();
-        MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
-        List<MonthlyTransaction> monthlyTransactions = currentUserMembershipEntry.getMonthlyTransactions().values()
-                .stream()
-                .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
-                .collect(Collectors.toList());
-        if (monthlyTransactions.isEmpty()) {
-            throw new MyException("Monthly membership fee already paid", HttpStatus.BAD_REQUEST);
-        }
-        return currentUserMembershipEntry;
     }
 
     public String setDefaultPaymentMethod(String paymentMethodId) {
