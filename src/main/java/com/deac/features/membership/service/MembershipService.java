@@ -17,6 +17,8 @@ public interface MembershipService {
 
     List<MembershipEntryInfoDto> listMembershipEntries(int pageNumber, int pageSize, Boolean filterHasPaid);
 
+    MembershipEntryInfoDto searchUser(String searchTerm);
+
     long getNumberOfMemberships(Boolean filterHasPaid);
 
     UserProfileDto getUserProfileData(String username);

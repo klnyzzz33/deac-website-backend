@@ -108,6 +108,33 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
+    public MembershipEntryInfoDto searchUser(String searchTerm) {
+        Optional<MembershipEntry> membershipEntryOptional = membershipRepository.findByUsername(searchTerm);
+        if (membershipEntryOptional.isEmpty()) {
+            membershipEntryOptional = membershipRepository.findByEmail(searchTerm);
+            if (membershipEntryOptional.isEmpty()) {
+                return null;
+            }
+        }
+        MembershipEntry membershipEntry = membershipEntryOptional.get();
+        User user = membershipEntry.getUser();
+        if (user.getRoles().contains(Role.ADMIN)) {
+            return null;
+        }
+        boolean hasReceipts = membershipEntry.getMonthlyTransactions().values()
+                .stream()
+                .anyMatch(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() != null);
+        return new MembershipEntryInfoDto(
+                user.getUsername(),
+                membershipEntry.getMemberSince(),
+                membershipEntry.isHasPaidMembershipFee(),
+                user.isEnabled(),
+                membershipEntry.isApproved(),
+                hasReceipts
+        );
+    }
+
+    @Override
     public long getNumberOfMemberships(Boolean filterHasPaid) {
         if (filterHasPaid == null) {
             return membershipRepository.count();

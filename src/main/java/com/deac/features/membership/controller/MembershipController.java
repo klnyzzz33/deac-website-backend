@@ -38,6 +38,11 @@ public class MembershipController {
         return membershipService.listMembershipEntries(pageNumber, entriesPerPage, filterHasPaid);
     }
 
+    @GetMapping("/api/admin/memberships/search")
+    public MembershipEntryInfoDto searchUser(@RequestParam(name = "searchTerm") String searchTerm) {
+        return membershipService.searchUser(searchTerm);
+    }
+
     @GetMapping("/api/admin/memberships/count")
     public Long getNumberOfMembershipEntries(@RequestParam(name = "filterHasPaid", required = false) Boolean filterHasPaid) {
         return membershipService.getNumberOfMemberships(filterHasPaid);

@@ -15,6 +15,9 @@ public interface MembershipRepository extends JpaRepository<MembershipEntry, Use
     @Query("SELECT n FROM MembershipEntry n WHERE n.user.username = :username")
     Optional<MembershipEntry> findByUsername(@Param("username") String username);
 
+    @Query("SELECT n FROM MembershipEntry n WHERE n.user.email = :email")
+    Optional<MembershipEntry> findByEmail(@Param("email") String email);
+
     List<MembershipEntry> findBy(Pageable pageable);
 
     List<MembershipEntry> findByHasPaidMembershipFee(boolean hasPaidMembershipFee, Pageable pageable);
