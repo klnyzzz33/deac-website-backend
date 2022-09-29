@@ -4,6 +4,8 @@ import com.deac.exception.MyException;
 import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.payment.dto.CheckoutInfoDto;
 import com.deac.features.payment.dto.CheckoutItemDto;
+import com.deac.features.payment.dto.ManualPaymentItemDto;
+import com.deac.features.payment.dto.ManualPaymentSaveDto;
 import com.deac.features.payment.persistence.entity.MonthlyTransaction;
 import com.deac.features.payment.service.general.PaymentService;
 import com.deac.mail.EmailService;
@@ -57,6 +59,60 @@ public class PaymentServiceImpl implements PaymentService {
         receiptsBaseDirectory = Objects.requireNonNull(environment.getProperty("file.receipts.rootdir", String.class));
     }
 
+    public String getCurrency() {
+        return currency;
+    }
+
+    public String savePaymentManual(ManualPaymentSaveDto payment) {
+        try {
+            User user = userService.getUserByUsername(payment.getUsername());
+            MembershipEntry userMembershipEntry = user.getMembershipEntry();
+            Map<String, MonthlyTransaction> monthlyTransactions = userMembershipEntry.getMonthlyTransactions();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
+            long totalAmount = 0;
+            Comparator<String> comparator = Comparator.comparing(YearMonth::parse);
+            SortedMap<String, String> items = new TreeMap<>(comparator.reversed());
+            Set<YearMonth> uniqueElements = new HashSet<>();
+            for (ManualPaymentItemDto item : payment.getItems()) {
+                if (item.getAmount() <= 0) {
+                    throw new MyException("Amount must be non-negative", HttpStatus.BAD_REQUEST);
+                }
+                totalAmount += item.getAmount();
+                if (!uniqueElements.add(item.getMonth())) {
+                    throw new MyException("Duplicate month detected", HttpStatus.BAD_REQUEST);
+                }
+                if (item.getMonth().isAfter(YearMonth.now()) || item.getMonth().isBefore(YearMonth.now().minusYears(1L))) {
+                    throw new MyException("Invalid month", HttpStatus.BAD_REQUEST);
+                }
+                String month = item.getMonth().format(formatter);
+                if (!monthlyTransactions.containsKey(month)) {
+                    monthlyTransactions.put(month, new MonthlyTransaction(item.getMonth(), null));
+                } else if (monthlyTransactions.get(month).getMonthlyTransactionReceiptPath() != null) {
+                    throw new MyException("Month already paid", HttpStatus.BAD_REQUEST);
+                }
+                items.put(item.getMonth().toString(), item.getAmount().toString());
+            }
+            totalAmount *= 100;
+            String monthlyTransactionReceiptPath = generatePaymentReceipt("Weboldalon kívül fizetve", "Weboldalon kívül fizetve", totalAmount, items, user);
+            for (Map.Entry<String, String> itemEntry : items.entrySet()) {
+                String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
+                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(monthlyTransactionReceiptPath);
+            }
+            user.setMembershipEntry(userMembershipEntry);
+            List<MonthlyTransaction> unPaidMonths = userMembershipEntry.getMonthlyTransactions().values()
+                    .stream()
+                    .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
+                    .collect(Collectors.toList());
+            if (unPaidMonths.isEmpty()) {
+                userMembershipEntry.setHasPaidMembershipFee(true);
+            }
+            userService.saveUser(user);
+            return "Payment successfully saved";
+        } catch (Exception e) {
+            throw new MyException("Could not save payment", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     @Override
     public CheckoutInfoDto listCheckoutInfo() {
         MembershipEntry currentUserMembershipEntry = checkIfMembershipAlreadyPaid();
@@ -96,7 +152,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @SuppressWarnings("DuplicatedCode")
-    public String generatePaymentReceipt(String paymentId, String paymentMethodId, Long totalAmount, Map<String, String> items, User currentUser) {
+    public String generatePaymentReceipt(String paymentId, String paymentMethodId, Long totalAmount, Map<String, String> items, User user) {
         try (PDDocument pdf = new PDDocument()) {
             PDPage page = new PDPage();
             pdf.addPage(page);
@@ -189,7 +245,7 @@ public class PaymentServiceImpl implements PaymentService {
 
                 contentStream.beginText();
                 contentStream.setFont(fontNormal, 13);
-                text = currentUser.getSurname() + " " + currentUser.getLastname();
+                text = user.getSurname() + " " + user.getLastname();
                 contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - fontNormal.getStringWidth(text) / 1000 * 13, currentLineHeightPosition);
                 contentStream.showText(text);
                 contentStream.endText();
@@ -204,7 +260,7 @@ public class PaymentServiceImpl implements PaymentService {
 
                 contentStream.beginText();
                 contentStream.setFont(fontNormal, 13);
-                text = "USER-" + currentUser.getId();
+                text = "USER-" + user.getId();
                 contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - fontNormal.getStringWidth(text) / 1000 * 13, currentLineHeightPosition);
                 contentStream.showText(text);
                 contentStream.endText();
@@ -219,7 +275,7 @@ public class PaymentServiceImpl implements PaymentService {
 
                 contentStream.beginText();
                 contentStream.setFont(fontNormal, 13);
-                text = currentUser.getEmail();
+                text = user.getEmail();
                 contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - fontNormal.getStringWidth(text) / 1000 * 13, currentLineHeightPosition);
                 contentStream.showText(text);
                 contentStream.endText();
@@ -267,18 +323,22 @@ public class PaymentServiceImpl implements PaymentService {
 
                 contentStream.beginText();
                 contentStream.setFont(fontNormal, 13);
-                if (!"PayPal".equals(paymentMethodId)) {
-                    PaymentMethod paymentMethod = retrievePaymentMethod(paymentMethodId);
-                    String cardBrand;
-                    String last4;
-                    text = "---";
-                    if (paymentMethod != null) {
-                        cardBrand = paymentMethod.getCard().getBrand();
-                        last4 = paymentMethod.getCard().getLast4();
-                        text = cardBrand.toUpperCase() + " - " + last4;
-                    }
-                } else {
-                    text = paymentMethodId;
+                text = "---";
+                switch (paymentMethodId) {
+                    case "PayPal":
+                        text = paymentMethodId;
+                        break;
+                    case "Weboldalon kívül fizetve":
+                        break;
+                    default:
+                        PaymentMethod paymentMethod = retrievePaymentMethod(paymentMethodId);
+                        String cardBrand;
+                        String last4;
+                        if (paymentMethod != null) {
+                            cardBrand = paymentMethod.getCard().getBrand();
+                            last4 = paymentMethod.getCard().getLast4();
+                            text = cardBrand.toUpperCase() + " - " + last4;
+                        }
                 }
                 contentStream.newLineAtOffset(margin + maxWidth + 20, currentLineHeightPosition);
                 contentStream.showText(text);
@@ -364,7 +424,7 @@ public class PaymentServiceImpl implements PaymentService {
             } catch (IOException e) {
                 throw new MyException("Could not generate receipt", HttpStatus.INTERNAL_SERVER_ERROR);
             }
-            String baseDir = receiptsBaseDirectory + "user_" + currentUser.getId() + "/";
+            String baseDir = receiptsBaseDirectory + "user_" + user.getId() + "/";
             String filePath = "receipt_" + receiptId + ".pdf";
             Files.createDirectories(Path.of(baseDir));
             String targetPath = baseDir + filePath;

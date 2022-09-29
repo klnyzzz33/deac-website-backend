@@ -1,7 +1,7 @@
 package com.deac.features.payment.controller.stripe;
 
 import com.deac.features.payment.dto.*;
-import com.deac.features.payment.service.stripe.impl.StripePaymentServiceImpl;
+import com.deac.features.payment.service.stripe.StripePaymentService;
 import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,10 +13,10 @@ import java.util.List;
 @RestController
 public class StripePaymentController {
 
-    private final StripePaymentServiceImpl stripePaymentService;
+    private final StripePaymentService stripePaymentService;
 
     @Autowired
-    public StripePaymentController(StripePaymentServiceImpl stripePaymentService) {
+    public StripePaymentController(StripePaymentService stripePaymentService) {
         this.stripePaymentService = stripePaymentService;
     }
 

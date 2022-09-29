@@ -152,15 +152,6 @@ public class MembershipServiceImpl implements MembershipService {
 
     @Override
     public ProfileDto getCurrentUserProfileData() {
-        /*MembershipEntry entry = userService.getCurrentUser().getMembershipEntry();
-        Map<String, MonthlyTransaction> monthlyTransactions = entry.getMonthlyTransactions();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
-        monthlyTransactions.put(YearMonth.now().minusMonths(1L).format(formatter), new MonthlyTransaction(YearMonth.now().minusMonths(1L), null));
-        monthlyTransactions.put(YearMonth.now().minusMonths(2L).format(formatter), new MonthlyTransaction(YearMonth.now().minusMonths(2L), null));
-        monthlyTransactions.put(YearMonth.now().minusMonths(3L).format(formatter), new MonthlyTransaction(YearMonth.now().minusMonths(3L), null));
-        membershipRepository.save(entry);*/
-
-
         User user = userService.getCurrentUser();
         MembershipEntry membershipEntry = user.getMembershipEntry();
         return new ProfileDto(
@@ -226,12 +217,11 @@ public class MembershipServiceImpl implements MembershipService {
                     }
                     if (membershipEntry.getUser().isEnabled()) {
                         Map<String, MonthlyTransaction> originalMonthlyTransactions = membershipEntry.getMonthlyTransactions();
-                        long unpaidMonths = originalMonthlyTransactions.entrySet()
+                        boolean unpaid = originalMonthlyTransactions.entrySet()
                                 .stream()
-                                .filter(entry -> !YearMonth.now().equals(entry.getValue().getMonthlyTransactionReceiptMonth()))
-                                .filter(entry -> entry.getValue().getMonthlyTransactionReceiptPath() == null)
-                                .count();
-                        if (unpaidMonths >= 3L) {
+                                .filter(entry -> entry.getValue().getMonthlyTransactionReceiptMonth().isBefore(YearMonth.now().minusMonths(2L)))
+                                .anyMatch(entry -> entry.getValue().getMonthlyTransactionReceiptPath() == null);
+                        if (unpaid) {
                             if (!onStartup) {
                                 userService.setEnabled(membershipEntry.getUser().getUsername(), false);
                             }
