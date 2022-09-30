@@ -38,7 +38,7 @@ public class News {
     @Column(nullable = false)
     private Date createDate;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @ToString.Exclude
     private List<ModifyEntry> modifyEntries;
 

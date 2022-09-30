@@ -142,7 +142,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             tokenRepository.save(new Token(new TokenKey(user.getId(), verifyTokenHash), expiresAt, "verify-email"));
             emailService.sendMessage(user.getEmail(),
                     "Verify your email",
-                    "<h3>Congratulations " + user.getUsername() + ", you have successfully registered to our website! In order to use our site, please verify your email here:</h3><br>http://localhost:4200/verify?token=" + verifyToken + "<br><h3>The link expires in 1 week, if you do not verify your email in the given time, we'll cancel your registration.<h3>");
+                    "<h3>Congratulations " + user.getUsername() + ", you have successfully registered to our website! In order to use our site, please verify your email here:</h3><br>http://localhost:4200/verify?token=" + verifyToken + "<br><h3>The link expires in 1 week, if you do not verify your email in the given time, we'll cancel your registration.<h3>",
+                    List.of());
             return "Successfully registered with user " + user.getUsername();
         } catch (MessagingException e) {
             userRepository.delete(user);
@@ -264,7 +265,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             Long expiresAt = System.currentTimeMillis() + 300000;
             emailService.sendMessage(email,
                     "Reset your password",
-                    "<h3>You've issued a request to reset your password. In order to do that, please follow this link: </h3><br>http://localhost:4200/reset-password?token=" + passwordToken);
+                    "<h3>You've issued a request to reset your password. In order to do that, please follow this link: </h3><br>http://localhost:4200/reset-password?token=" + passwordToken,
+                    List.of());
             tokenRepository.save(new Token(new TokenKey(user.getId(), passwordTokenHash), expiresAt, "password-reset"));
             return "Recovery link sent if user exists";
         } catch (MessagingException e) {
@@ -302,7 +304,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             tokenRepository.deleteAllByUserIdAndPurpose(userId, "password-reset");
             emailService.sendMessage(user.getEmail(),
                     "Your password has been changed",
-                    "<h3>We've noticed that your password to your account has been changed. If this wasn't you, please contact our support immediately.");
+                    "<h3>We've noticed that your password to your account has been changed. If this wasn't you, please contact our support immediately.",
+                    List.of());
             return "Password successfully reset";
         } catch (MessagingException e) {
             return "Password successfully reset";
@@ -319,7 +322,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             User user = userOptional.get();
             emailService.sendMessage(email,
                     "Username reminder",
-                    "<h3>You've issued a request to get a reminder of your username.</h3><br><h3>Your username associated with this email is " + user.getUsername() + ".</h3>");
+                    "<h3>You've issued a request to get a reminder of your username.</h3><br><h3>Your username associated with this email is " + user.getUsername() + ".</h3>",
+                    List.of());
             return "Recovery email sent if user exists";
         } catch (MessagingException e) {
             return "Recovery email sent if user exists";

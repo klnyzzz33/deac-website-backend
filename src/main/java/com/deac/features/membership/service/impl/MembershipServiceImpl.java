@@ -301,7 +301,8 @@ public class MembershipServiceImpl implements MembershipService {
                     try {
                         emailService.sendMessage(membershipEntry.getUser().getEmail(),
                                 "Monthly reminder to pay your membership fee",
-                                "<h3>Dear " + membershipEntry.getUser().getSurname() + " " + membershipEntry.getUser().getLastname() + ", this is your monthly automated email to remind you to pay your membership fee. You currently have " + unpaidMonths.size() + " unpaid month(s):<br>" + unpaidMonthsString + "Remember that if you do not pay the given fees for more than 3 months, you will be banned from the site.<br>In case you get banned but you would like to rejoin the site, contact our support.<h3>");
+                                "<h3>Dear " + membershipEntry.getUser().getSurname() + " " + membershipEntry.getUser().getLastname() + ", this is your monthly automated email to remind you to pay your membership fee. You currently have " + unpaidMonths.size() + " unpaid month(s):<br>" + unpaidMonthsString + "Remember that if you do not pay the given fees for more than 3 months, you will be banned from the site.<br>In case you get banned but you would like to rejoin the site, contact our support.<h3>",
+                                List.of());
                     } catch (MessagingException ignored) {
                     }
                 });

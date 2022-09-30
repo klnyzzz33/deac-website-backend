@@ -6,6 +6,7 @@ import com.deac.features.payment.dto.CheckoutItemDto;
 import com.deac.features.payment.persistence.entity.MonthlyTransaction;
 import com.deac.features.payment.service.general.PaymentService;
 import com.deac.features.payment.service.paypal.PaypalPaymentService;
+import com.deac.mail.Attachment;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import com.google.gson.Gson;
@@ -150,6 +151,7 @@ public class PaypalPaymentServiceImpl implements PaypalPaymentService {
     }
 
     @Override
+    @SuppressWarnings(value = "DuplicatedCode")
     public String savePayment(String orderId) {
         try {
             User currentUser = userService.getCurrentUser();
@@ -169,16 +171,16 @@ public class PaypalPaymentServiceImpl implements PaypalPaymentService {
                 JSONObject tmp = purchaseUnitItems.getJSONObject(i);
                 items.put(tmp.get("name").toString(), ((Long) Double.valueOf(tmp.getJSONObject("unit_amount").get("value").toString()).longValue()).toString());
             }
-            String monthlyTransactionReceiptPath = paymentService.generatePaymentReceipt(order.get("id").toString(), "PayPal", totalAmount, items, currentUser);
+            Attachment savedFileInfo = paymentService.generatePaymentReceipt(order.get("id").toString(), "PayPal", totalAmount, items, currentUser);
             for (Map.Entry<String, String> itemEntry : items.entrySet()) {
                 String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
-                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(monthlyTransactionReceiptPath);
+                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(savedFileInfo.getName());
             }
             currentUser.setMembershipEntry(currentUserMembershipEntry);
             currentUserMembershipEntry.setHasPaidMembershipFee(true);
             currentUserMembershipEntry.setApproved(true);
             userService.saveUser(currentUser);
-            paymentService.sendPaymentSuccessEmail(currentUser, new ArrayList<>(items.keySet()));
+            paymentService.sendPaymentSuccessEmail(currentUser, new ArrayList<>(items.keySet()), List.of(savedFileInfo));
             return "Payment successfully saved";
         } catch (Exception e) {
             throw new MyException("Could not save payment", HttpStatus.INTERNAL_SERVER_ERROR);

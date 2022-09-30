@@ -8,6 +8,7 @@ import com.deac.features.payment.dto.ManualPaymentItemDto;
 import com.deac.features.payment.dto.ManualPaymentSaveDto;
 import com.deac.features.payment.persistence.entity.MonthlyTransaction;
 import com.deac.features.payment.service.general.PaymentService;
+import com.deac.mail.Attachment;
 import com.deac.mail.EmailService;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
@@ -59,10 +60,13 @@ public class PaymentServiceImpl implements PaymentService {
         receiptsBaseDirectory = Objects.requireNonNull(environment.getProperty("file.receipts.rootdir", String.class));
     }
 
+    @Override
     public String getCurrency() {
         return currency;
     }
 
+    @Override
+    @SuppressWarnings(value = "DuplicatedCode")
     public String savePaymentManual(ManualPaymentSaveDto payment) {
         try {
             User user = userService.getUserByUsername(payment.getUsername());
@@ -93,10 +97,10 @@ public class PaymentServiceImpl implements PaymentService {
                 items.put(item.getMonth().toString(), item.getAmount().toString());
             }
             totalAmount *= 100;
-            String monthlyTransactionReceiptPath = generatePaymentReceipt("Weboldalon kívül fizetve", "Weboldalon kívül fizetve", totalAmount, items, user);
+            Attachment savedFileInfo = generatePaymentReceipt("Weboldalon kívül fizetve", "Weboldalon kívül fizetve", totalAmount, items, user);
             for (Map.Entry<String, String> itemEntry : items.entrySet()) {
                 String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
-                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(monthlyTransactionReceiptPath);
+                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(savedFileInfo.getName());
             }
             user.setMembershipEntry(userMembershipEntry);
             List<MonthlyTransaction> unPaidMonths = userMembershipEntry.getMonthlyTransactions().values()
@@ -152,291 +156,293 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @SuppressWarnings("DuplicatedCode")
-    public String generatePaymentReceipt(String paymentId, String paymentMethodId, Long totalAmount, Map<String, String> items, User user) {
-        try (PDDocument pdf = new PDDocument()) {
+    public Attachment generatePaymentReceipt(String paymentId, String paymentMethodId, Long totalAmount, Map<String, String> items, User user) {
+        try {
+            PDDocument pdf = new PDDocument();
             PDPage page = new PDPage();
             pdf.addPage(page);
             float margin = 50;
             PDFont fontNormal = PDType0Font.load(pdf, new ClassPathResource("fonts/Montserrat-Regular.ttf").getFile());
             PDFont fontBold = PDType0Font.load(pdf, new ClassPathResource("fonts/Montserrat-Bold.ttf").getFile());
             String receiptId = UUID.randomUUID().toString();
-            try (PDPageContentStream contentStream = new PDPageContentStream(pdf, page)) {
-                String text;
-                float textWidth;
-                float textHeight;
-                float currentLineHeightPosition;
+            PDPageContentStream contentStream = new PDPageContentStream(pdf, page);
+            String text;
+            float textWidth;
+            float textHeight;
+            float currentLineHeightPosition;
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 22);
-                contentStream.setNonStrokingColor(Color.BLACK);
-                text = "Számla";
-                currentLineHeightPosition = page.getMediaBox().getHeight() - margin;
-                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 22);
+            contentStream.setNonStrokingColor(Color.BLACK);
+            text = "Számla";
+            currentLineHeightPosition = page.getMediaBox().getHeight() - margin;
+            contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 22);
-                contentStream.setNonStrokingColor(Color.GRAY);
-                text = "DEAC Kyokushin Karate";
-                textWidth = fontBold.getStringWidth(text) / 1000 * 22;
-                textHeight = fontBold.getFontDescriptor().getFontBoundingBox().getHeight() / 1000 * 22;
-                contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 22);
+            contentStream.setNonStrokingColor(Color.GRAY);
+            text = "DEAC Kyokushin Karate";
+            textWidth = fontBold.getStringWidth(text) / 1000 * 22;
+            textHeight = fontBold.getFontDescriptor().getFontBoundingBox().getHeight() / 1000 * 22;
+            contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                contentStream.setNonStrokingColor(Color.BLACK);
-                text = "Számla azonosító:";
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 25;
-                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            contentStream.setNonStrokingColor(Color.BLACK);
+            text = "Számla azonosító:";
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 25;
+            contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontNormal, 13);
-                text = receiptId;
-                textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
-                textHeight = fontNormal.getFontDescriptor().getFontBoundingBox().getHeight() / 1000 * 13;
-                contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            text = receiptId;
+            textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
+            textHeight = fontNormal.getFontDescriptor().getFontBoundingBox().getHeight() / 1000 * 13;
+            contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                text = "Számla kiállításának dátuma:";
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            text = "Számla kiállításának dátuma:";
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+            contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontNormal, 13);
-                text = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
-                contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            text = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
+            contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                text = "Számla befizetője";
-                textWidth = fontBold.getStringWidth(text) / 1000 * 13;
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            text = "Számla befizetője";
+            textWidth = fontBold.getStringWidth(text) / 1000 * 13;
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+            contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                text = "---";
-                contentStream.newLineAtOffset(margin + textWidth + 10, currentLineHeightPosition);
-                textWidth = margin + textWidth + 10 + fontBold.getStringWidth(text) / 1000 * 13;
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            text = "---";
+            contentStream.newLineAtOffset(margin + textWidth + 10, currentLineHeightPosition);
+            textWidth = margin + textWidth + 10 + fontBold.getStringWidth(text) / 1000 * 13;
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                contentStream.newLineAtOffset(textWidth + 10, currentLineHeightPosition);
-                text = "név:";
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            contentStream.newLineAtOffset(textWidth + 10, currentLineHeightPosition);
+            text = "név:";
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontNormal, 13);
-                text = user.getSurname() + " " + user.getLastname();
-                contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - fontNormal.getStringWidth(text) / 1000 * 13, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            text = user.getSurname() + " " + user.getLastname();
+            contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - fontNormal.getStringWidth(text) / 1000 * 13, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                contentStream.newLineAtOffset(textWidth + 10, currentLineHeightPosition);
-                text = "azonosító:";
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+            contentStream.newLineAtOffset(textWidth + 10, currentLineHeightPosition);
+            text = "azonosító:";
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontNormal, 13);
-                text = "USER-" + user.getId();
-                contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - fontNormal.getStringWidth(text) / 1000 * 13, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            text = "USER-" + user.getId();
+            contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - fontNormal.getStringWidth(text) / 1000 * 13, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                contentStream.newLineAtOffset(textWidth + 10, currentLineHeightPosition);
-                text = "email:";
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+            contentStream.newLineAtOffset(textWidth + 10, currentLineHeightPosition);
+            text = "email:";
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontNormal, 13);
-                text = user.getEmail();
-                contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - fontNormal.getStringWidth(text) / 1000 * 13, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            text = user.getEmail();
+            contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - fontNormal.getStringWidth(text) / 1000 * 13, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 17);
-                text = "ÖSSZEGZÉS";
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 35;
-                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 17);
+            text = "ÖSSZEGZÉS";
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 35;
+            contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                text = "Tranzakció azonosító:";
-                float maxWidth = Math.max(
-                        fontBold.getStringWidth("Tranzakció azonosító:") / 1000 * 13,
-                        Math.max(
-                                fontBold.getStringWidth("Fizetési mód:") / 1000 * 13,
-                                Math.max(
-                                        fontBold.getStringWidth("Összeg:") / 1000 * 13,
-                                        20 + fontNormal.getStringWidth("____.__. havi tagdíj") / 1000 * 13
-                                )
-                        )
-                );
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 15;
-                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            text = "Tranzakció azonosító:";
+            float maxWidth = Math.max(
+                    fontBold.getStringWidth("Tranzakció azonosító:") / 1000 * 13,
+                    Math.max(
+                            fontBold.getStringWidth("Fizetési mód:") / 1000 * 13,
+                            Math.max(
+                                    fontBold.getStringWidth("Összeg:") / 1000 * 13,
+                                    20 + fontNormal.getStringWidth("____.__. havi tagdíj") / 1000 * 13
+                            )
+                    )
+            );
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 15;
+            contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontNormal, 13);
-                text = paymentId;
-                contentStream.newLineAtOffset(margin + maxWidth + 20, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            text = paymentId;
+            contentStream.newLineAtOffset(margin + maxWidth + 20, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                text = "Fizetési mód:";
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            text = "Fizetési mód:";
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+            contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
 
-                contentStream.beginText();
-                contentStream.setFont(fontNormal, 13);
-                text = "---";
-                switch (paymentMethodId) {
-                    case "PayPal":
-                        text = paymentMethodId;
-                        break;
-                    case "Weboldalon kívül fizetve":
-                        break;
-                    default:
-                        PaymentMethod paymentMethod = retrievePaymentMethod(paymentMethodId);
-                        String cardBrand;
-                        String last4;
-                        if (paymentMethod != null) {
-                            cardBrand = paymentMethod.getCard().getBrand();
-                            last4 = paymentMethod.getCard().getLast4();
-                            text = cardBrand.toUpperCase() + " - " + last4;
-                        }
-                }
-                contentStream.newLineAtOffset(margin + maxWidth + 20, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
-
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                text = "Termékek:";
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
-
-                for (Map.Entry<String, String> itemEntry : items.entrySet()) {
-                    String productName = YearMonth.parse(itemEntry.getKey()).format(DateTimeFormatter.ofPattern("yyyy.MM."));
-                    String productPrice = itemEntry.getValue();
-
-                    contentStream.beginText();
-                    contentStream.setFont(fontNormal, 13);
-                    text = productName + " havi tagdíj";
-                    currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                    contentStream.newLineAtOffset(margin + 20, currentLineHeightPosition);
-                    contentStream.showText(text);
-                    contentStream.endText();
-
-                    contentStream.beginText();
-                    contentStream.setFont(fontNormal, 13);
-                    if ("huf".equals(currency)) {
-                        text = productPrice + ".00 Ft";
-                    } else {
-                        text = productPrice + ".00";
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            text = "---";
+            switch (paymentMethodId) {
+                case "PayPal":
+                    text = paymentMethodId;
+                    break;
+                case "Weboldalon kívül fizetve":
+                    break;
+                default:
+                    PaymentMethod paymentMethod = retrievePaymentMethod(paymentMethodId);
+                    String cardBrand;
+                    String last4;
+                    if (paymentMethod != null) {
+                        cardBrand = paymentMethod.getCard().getBrand();
+                        last4 = paymentMethod.getCard().getLast4();
+                        text = cardBrand.toUpperCase() + " - " + last4;
                     }
-                    contentStream.newLineAtOffset(margin + maxWidth + 20, currentLineHeightPosition);
-                    contentStream.showText(text);
-                    contentStream.endText();
-                }
+            }
+            contentStream.newLineAtOffset(margin + maxWidth + 20, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
+
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            text = "Termékek:";
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+            contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
+
+            for (Map.Entry<String, String> itemEntry : items.entrySet()) {
+                String productName = YearMonth.parse(itemEntry.getKey()).format(DateTimeFormatter.ofPattern("yyyy.MM."));
+                String productPrice = itemEntry.getValue();
 
                 contentStream.beginText();
-                contentStream.setFont(fontBold, 13);
-                text = "Összesen:";
+                contentStream.setFont(fontNormal, 13);
+                text = productName + " havi tagdíj";
                 currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+                contentStream.newLineAtOffset(margin + 20, currentLineHeightPosition);
                 contentStream.showText(text);
                 contentStream.endText();
 
                 contentStream.beginText();
                 contentStream.setFont(fontNormal, 13);
                 if ("huf".equals(currency)) {
-                    text = totalAmount / 100 + ".00 Ft";
+                    text = productPrice + ".00 Ft";
                 } else {
-                    text = totalAmount.toString() + ".00";
+                    text = productPrice + ".00";
                 }
                 contentStream.newLineAtOffset(margin + maxWidth + 20, currentLineHeightPosition);
                 contentStream.showText(text);
                 contentStream.endText();
-
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 15);
-                text = "DEAC Kyokushin Karate";
-                textWidth = fontBold.getStringWidth(text) / 1000 * 15;
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 70;
-                contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
-
-                contentStream.beginText();
-                contentStream.setFont(fontNormal, 13);
-                text = "+36307297040";
-                textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
-
-                contentStream.beginText();
-                contentStream.setFont(fontNormal, 13);
-                text = "deackyokushindev@gmail.com";
-                textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
-                currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
-                contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
-                contentStream.showText(text);
-                contentStream.endText();
-            } catch (IOException e) {
-                throw new MyException("Could not generate receipt", HttpStatus.INTERNAL_SERVER_ERROR);
             }
+
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 13);
+            text = "Összesen:";
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+            contentStream.newLineAtOffset(margin, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
+
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            if ("huf".equals(currency)) {
+                text = totalAmount / 100 + ".00 Ft";
+            } else {
+                text = totalAmount.toString() + ".00";
+            }
+            contentStream.newLineAtOffset(margin + maxWidth + 20, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
+
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 15);
+            text = "DEAC Kyokushin Karate";
+            textWidth = fontBold.getStringWidth(text) / 1000 * 15;
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 70;
+            contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
+
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            text = "+36307297040";
+            textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+            contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
+
+            contentStream.beginText();
+            contentStream.setFont(fontNormal, 13);
+            text = "deackyokushindev@gmail.com";
+            textWidth = fontNormal.getStringWidth(text) / 1000 * 13;
+            currentLineHeightPosition = currentLineHeightPosition - textHeight - 10;
+            contentStream.newLineAtOffset(page.getMediaBox().getWidth() - margin - textWidth, currentLineHeightPosition);
+            contentStream.showText(text);
+            contentStream.endText();
             String baseDir = receiptsBaseDirectory + "user_" + user.getId() + "/";
             String filePath = "receipt_" + receiptId + ".pdf";
             Files.createDirectories(Path.of(baseDir));
             String targetPath = baseDir + filePath;
+            contentStream.close();
             pdf.save(targetPath);
-            return filePath;
+            pdf.close();
+            Path path = Path.of(targetPath);
+            byte[] savedData = Files.readAllBytes(path);
+            return new Attachment(filePath, savedData);
         } catch (IOException e) {
             throw new MyException("Could not generate receipt", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     @Override
-    public void sendPaymentSuccessEmail(User currentUser, List<String> items) {
+    public void sendPaymentSuccessEmail(User user, List<String> items, List<Attachment> attachments) {
         StringBuilder paidMonthsString = new StringBuilder();
         for (int i = 0; i < items.size(); i++) {
             paidMonthsString.append(items.get(i));
@@ -447,9 +453,10 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
         try {
-            emailService.sendMessage(currentUser.getEmail(),
+            emailService.sendMessage(user.getEmail(),
                     "Your payment receipt",
-                    "<h3>Dear " + currentUser.getSurname() + " " + currentUser.getLastname() + ", you have successfully paid the membership fees for the following months:<br>" + paidMonthsString + "We've sent your payment receipt as an attachment.<h3>");
+                    "<h3>Dear " + user.getSurname() + " " + user.getLastname() + ", you have successfully paid the membership fees for the following months:<br>" + paidMonthsString + "We've sent your payment receipt as an attachment.<h3>",
+                    attachments);
         } catch (MessagingException ignored) {
         }
     }
