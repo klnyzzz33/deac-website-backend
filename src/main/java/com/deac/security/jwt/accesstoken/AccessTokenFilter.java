@@ -29,7 +29,8 @@ public class AccessTokenFilter extends OncePerRequestFilter {
             "/api/user/forgot_username",
             "/api/user/verify",
             "/api/user/auth/refresh",
-            "/api/news/**"
+            "/api/news/**",
+            "/api/support/ticket/create_anonymous"
     };
 
     private final AccessTokenProvider accessTokenProvider;

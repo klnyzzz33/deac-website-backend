@@ -1,6 +1,7 @@
 package com.deac.user.persistence.entity;
 
 import com.deac.features.membership.persistence.entity.MembershipEntry;
+import com.deac.features.support.persistence.entity.Ticket;
 import lombok.*;
 
 import javax.persistence.*;
@@ -48,6 +49,10 @@ public class User {
     @JoinColumn(name = "membershipentry_id")
     @ToString.Exclude
     private MembershipEntry membershipEntry;
+
+    @OneToMany(mappedBy = "issuer", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private List<Ticket> tickets = List.of();
 
     public User(String username, String email, String password, String surname, String lastname, List<Role> roles) {
         this.username = username;

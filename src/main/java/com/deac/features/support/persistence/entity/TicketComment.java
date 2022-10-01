@@ -9,22 +9,18 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.persistence.*;
 import java.util.Date;
-import java.util.List;
 
 @Entity
 @Getter
 @Setter
 @ToString
 @NoArgsConstructor
-public class Ticket {
+public class TicketComment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(nullable = false)
     private Integer id;
-
-    @Column(nullable = false)
-    private String title;
 
     @Column(nullable = false)
     private String content;
@@ -33,24 +29,13 @@ public class Ticket {
     @ToString.Exclude
     private User issuer;
 
-    private String issuerEmail;
-
     @DateTimeFormat(pattern = "yyyy.MM.dd")
     @Column(nullable = false)
     private Date createDate = new Date();
 
-    @Column(nullable = false)
-    private boolean closed = false;
-
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @ToString.Exclude
-    private List<TicketComment> comments;
-
-    public Ticket(String title, String content, User issuer, String issuerEmail) {
-        this.title = title;
+    public TicketComment(String content, User issuer) {
         this.content = content;
         this.issuer = issuer;
-        this.issuerEmail = issuerEmail;
     }
 
 }
