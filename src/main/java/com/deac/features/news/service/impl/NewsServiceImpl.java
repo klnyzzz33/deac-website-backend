@@ -8,6 +8,7 @@ import com.deac.features.news.persistence.entity.News;
 import com.deac.features.news.persistence.repository.NewsRepository;
 import com.deac.features.news.service.NewsService;
 import com.deac.exception.MyException;
+import com.deac.misc.RandomStringHelper;
 import com.deac.user.service.UserService;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.deac.misc.RandomStringHelper.generateRandomString;
+
 @Service
 public class NewsServiceImpl implements NewsService {
 
@@ -38,8 +41,6 @@ public class NewsServiceImpl implements NewsService {
     private final String imageUploadBaseDirectory;
 
     private final String imageUploadBaseUrl;
-
-    private final String randomStringChars;
 
     @Autowired
     public NewsServiceImpl(NewsRepository newsRepository, UserService userService, Environment environment) {
@@ -55,12 +56,14 @@ public class NewsServiceImpl implements NewsService {
                 throw new RuntimeException(e);
             }
         }
-        randomStringChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     }
 
     @Override
     public String uploadImage(MultipartFile file) {
         try {
+            if (!Objects.requireNonNull(file.getContentType()).startsWith("image/")) {
+                throw new MyException("Not an image file", HttpStatus.BAD_REQUEST);
+            }
             byte[] fileBytes = file.getBytes();
             String originalFilename = file.getOriginalFilename();
             String randomizedFilename = FilenameUtils.getBaseName(originalFilename)
@@ -73,15 +76,6 @@ public class NewsServiceImpl implements NewsService {
         } catch (IOException e) {
             throw new MyException("Image upload failed", HttpStatus.INTERNAL_SERVER_ERROR);
         }
-    }
-
-    private String generateRandomString(int length) {
-        Random random = new Random();
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < length; i++) {
-            builder.append(randomStringChars.charAt(random.nextInt(randomStringChars.length())));
-        }
-        return builder.toString();
     }
 
     @Override

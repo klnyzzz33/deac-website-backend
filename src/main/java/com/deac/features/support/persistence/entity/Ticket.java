@@ -8,6 +8,7 @@ import lombok.ToString;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.persistence.*;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -26,7 +27,7 @@ public class Ticket {
     @Column(nullable = false)
     private String title;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @ManyToOne(fetch = FetchType.EAGER)
@@ -41,6 +42,9 @@ public class Ticket {
 
     @Column(nullable = false)
     private boolean closed = false;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    private List<String> attachmentPaths;
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @ToString.Exclude

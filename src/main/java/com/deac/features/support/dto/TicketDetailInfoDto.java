@@ -24,6 +24,8 @@ public class TicketDetailInfoDto {
 
     private boolean closed;
 
+    private List<String> attachments;
+
     private List<TicketCommentDto> comments;
 
 }

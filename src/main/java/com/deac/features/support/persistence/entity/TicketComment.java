@@ -22,7 +22,7 @@ public class TicketComment {
     @Column(nullable = false)
     private Integer id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @ManyToOne(fetch = FetchType.EAGER)

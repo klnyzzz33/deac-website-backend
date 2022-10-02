@@ -8,17 +8,23 @@ import com.deac.features.support.persistence.repository.SupportRepository;
 import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Comparator;
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,10 +34,13 @@ public class SupportService {
 
     private final UserService userService;
 
+    private final String ticketAttachmentUploadBaseDirectory;
+
     @Autowired
-    public SupportService(SupportRepository supportRepository, UserService userService) {
+    public SupportService(SupportRepository supportRepository, UserService userService, Environment environment) {
         this.supportRepository = supportRepository;
         this.userService = userService;
+        ticketAttachmentUploadBaseDirectory = Objects.requireNonNull(environment.getProperty("file.tickets.rootdir", String.class));
     }
 
     public List<TicketInfoDto> listTickets(int pageNumber, int pageSize) {
@@ -53,10 +62,13 @@ public class SupportService {
         return "Successfully deleted ticket";
     }
 
-    public Integer createTicket(String content) {
+    public Integer createTicket(String content, MultipartFile[] files) {
         User currentUser = userService.getCurrentUser();
         if (currentUser.getRoles().contains(Role.ADMIN)) {
             throw new MyException("Admins cannot create tickets", HttpStatus.BAD_REQUEST);
+        }
+        if (files.length > 5) {
+            throw new MyException("Maximum number of files allowed is 5", HttpStatus.BAD_REQUEST);
         }
         Ticket ticket = new Ticket(
                 "Ticket-" + RandomStringUtils.random(8, "0123456789abcdef"),
@@ -64,8 +76,29 @@ public class SupportService {
                 currentUser,
                 currentUser.getEmail()
         );
+        List<String> savedFileNames = uploadAttachments(files, ticket.getTitle(), currentUser);
+        ticket.setAttachmentPaths(savedFileNames);
         supportRepository.save(ticket);
         return ticket.getId();
+    }
+
+    private List<String> uploadAttachments(MultipartFile[] files, String ticketId, User currentUser) {
+        try {
+            String baseDir = ticketAttachmentUploadBaseDirectory + "user_" + currentUser.getId() + "/" + ticketId + "/";
+            List<String> savedFileNames = new ArrayList<>();
+            for (MultipartFile file : files) {
+                if (!Objects.requireNonNull(file.getContentType()).startsWith("image/") && !file.getContentType().startsWith("application/pdf")) {
+                    throw new MyException("Unsupported file type", HttpStatus.BAD_REQUEST);
+                }
+                byte[] fileBytes = file.getBytes();
+                Files.createDirectories(Path.of(baseDir));
+                Path targetPath = Path.of(baseDir + file.getOriginalFilename());
+                savedFileNames.add(Files.write(targetPath, fileBytes).getFileName().toString());
+            }
+            return savedFileNames;
+        } catch (IOException e) {
+            throw new MyException("File upload failed", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     public Integer createAnonymousTicket(TicketCreateDto ticketCreateDto) {
@@ -116,6 +149,8 @@ public class SupportService {
     @Transactional
     public TicketDetailInfoDto getTicketDetails(Integer id) {
         Ticket ticket = supportRepository.findById(id).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+        Hibernate.initialize(ticket.getAttachmentPaths());
+        Hibernate.initialize(ticket.getComments());
         return new TicketDetailInfoDto(
                 ticket.getId(),
                 ticket.getTitle(),
@@ -123,6 +158,7 @@ public class SupportService {
                 ticket.getIssuer().getUsername(),
                 ticket.getCreateDate(),
                 ticket.isClosed(),
+                ticket.getAttachmentPaths(),
                 ticketCommentListToTicketCommentDtoList(ticket.getComments())
         );
     }
@@ -140,6 +176,18 @@ public class SupportService {
                 })
                 .sorted(Comparator.comparing(TicketCommentDto::getCreateDate))
                 .collect(Collectors.toList());
+    }
+
+    public AttachmentDownloadDto downloadCurrentUserTicketAttachment(String ticketId, String attachmentPath) {
+        try {
+            User currentUser = userService.getCurrentUser();
+            String baseDir = ticketAttachmentUploadBaseDirectory + "user_" + currentUser.getId() + "/" + ticketId + "/";
+            String targetPath = baseDir + attachmentPath;
+            Path path = Path.of(targetPath);
+            return new AttachmentDownloadDto(Files.probeContentType(path), Files.readAllBytes(path));
+        } catch (IOException e) {
+            throw new MyException("Could not download ticket attachment", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @Transactional
