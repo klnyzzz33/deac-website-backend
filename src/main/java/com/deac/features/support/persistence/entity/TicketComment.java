@@ -9,6 +9,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.persistence.*;
 import java.util.Date;
+import java.util.List;
 
 @Entity
 @Getter
@@ -22,6 +23,9 @@ public class TicketComment {
     @Column(nullable = false)
     private Integer id;
 
+    @Column(nullable = false, unique = true)
+    private String title;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
@@ -33,7 +37,11 @@ public class TicketComment {
     @Column(nullable = false)
     private Date createDate = new Date();
 
-    public TicketComment(String content, User issuer) {
+    @ElementCollection(fetch = FetchType.LAZY)
+    private List<String> attachmentPaths;
+
+    public TicketComment(String title, String content, User issuer) {
+        this.title = title;
         this.content = content;
         this.issuer = issuer;
     }

@@ -8,7 +8,6 @@ import com.deac.features.support.persistence.repository.SupportRepository;
 import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,11 +46,15 @@ public class SupportService {
         return listTicketsHelper(pageNumber, pageSize, null);
     }
 
-    public String closeTicket(Integer ticketId) {
+    public Long getNumberOfTickets() {
+        return supportRepository.count();
+    }
+
+    public String closeTicket(Integer ticketId, boolean value) {
         Ticket ticket = supportRepository.findById(ticketId).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
-        ticket.setClosed(true);
+        ticket.setClosed(value);
         supportRepository.save(ticket);
-        return "Successfully deleted ticket";
+        return "Ticket status: " + (!value ? "closed" : "open") + " -> " + (value ? "closed" : "open");
     }
 
     public String deleteTicket(Integer ticketId) {
@@ -60,6 +63,22 @@ public class SupportService {
         }
         supportRepository.deleteById(ticketId);
         return "Successfully deleted ticket";
+    }
+
+    @Transactional
+    public String deleteComment(Integer ticketId, Integer commentId) {
+        Ticket ticket = supportRepository.findById(ticketId).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+        Hibernate.initialize(ticket.getComments());
+        Optional<TicketComment> optionalTicketComment = ticket.getComments().stream()
+                .filter(ticketComment -> ticketComment.getId().equals(commentId))
+                .findFirst();
+        if (optionalTicketComment.isEmpty()) {
+            throw new MyException("Comment does not exist", HttpStatus.BAD_REQUEST);
+        }
+        TicketComment ticketComment = optionalTicketComment.get();
+        ticket.getComments().remove(ticketComment);
+        supportRepository.save(ticket);
+        return "Successfully deleted comment";
     }
 
     public Integer createTicket(String content, MultipartFile[] files) {
@@ -76,15 +95,15 @@ public class SupportService {
                 currentUser,
                 currentUser.getEmail()
         );
-        List<String> savedFileNames = uploadAttachments(files, ticket.getTitle(), currentUser);
+        List<String> savedFileNames = uploadAttachments(files, currentUser.getId(), ticket.getTitle(), null);
         ticket.setAttachmentPaths(savedFileNames);
         supportRepository.save(ticket);
         return ticket.getId();
     }
 
-    private List<String> uploadAttachments(MultipartFile[] files, String ticketId, User currentUser) {
+    private List<String> uploadAttachments(MultipartFile[] files, Integer userId, String ticketId, String commentId) {
         try {
-            String baseDir = ticketAttachmentUploadBaseDirectory + "user_" + currentUser.getId() + "/" + ticketId + "/";
+            String baseDir = ticketAttachmentUploadBaseDirectory + "user_" + userId + "/" + ticketId + "/" + (commentId != null ? (commentId + "/") : "");
             List<String> savedFileNames = new ArrayList<>();
             for (MultipartFile file : files) {
                 if (!Objects.requireNonNull(file.getContentType()).startsWith("image/") && !file.getContentType().startsWith("application/pdf")) {
@@ -99,17 +118,6 @@ public class SupportService {
         } catch (IOException e) {
             throw new MyException("File upload failed", HttpStatus.INTERNAL_SERVER_ERROR);
         }
-    }
-
-    public Integer createAnonymousTicket(TicketCreateDto ticketCreateDto) {
-        Ticket ticket = new Ticket(
-                "Ticket-" + RandomStringUtils.random(8, "0123456789abcdef"),
-                ticketCreateDto.getContent(),
-                null,
-                ticketCreateDto.getIssuerEmail()
-        );
-        supportRepository.save(ticket);
-        return ticket.getId();
     }
 
     public List<TicketInfoDto> listCurrentUserTickets(int pageNumber, int pageSize) {
@@ -148,7 +156,11 @@ public class SupportService {
 
     @Transactional
     public TicketDetailInfoDto getTicketDetails(Integer id) {
+        User currentUser = userService.getCurrentUser();
         Ticket ticket = supportRepository.findById(id).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+        if (currentUser.getRoles().contains(Role.CLIENT) && !ticket.getIssuer().equals(currentUser)) {
+            throw new MyException("You cannot view someone else's ticket", HttpStatus.BAD_REQUEST);
+        }
         Hibernate.initialize(ticket.getAttachmentPaths());
         Hibernate.initialize(ticket.getComments());
         return new TicketDetailInfoDto(
@@ -166,22 +178,28 @@ public class SupportService {
     private List<TicketCommentDto> ticketCommentListToTicketCommentDtoList(List<TicketComment> comments) {
         return comments.stream()
                 .map(ticketComment -> {
-                    User issuer = ticketComment.getIssuer();
+                    Hibernate.initialize(ticketComment.getAttachmentPaths());
                     return new TicketCommentDto(
+                            ticketComment.getId(),
+                            ticketComment.getTitle(),
                             ticketComment.getContent(),
                             ticketComment.getIssuer().getUsername(),
-                            issuer.getRoles(),
-                            ticketComment.getCreateDate()
+                            ticketComment.getCreateDate(),
+                            ticketComment.getAttachmentPaths()
                     );
                 })
                 .sorted(Comparator.comparing(TicketCommentDto::getCreateDate))
                 .collect(Collectors.toList());
     }
 
-    public AttachmentDownloadDto downloadCurrentUserTicketAttachment(String ticketId, String attachmentPath) {
+    public AttachmentDownloadDto downloadTicketAttachment(String ticketId, String attachmentPath) {
         try {
             User currentUser = userService.getCurrentUser();
-            String baseDir = ticketAttachmentUploadBaseDirectory + "user_" + currentUser.getId() + "/" + ticketId + "/";
+            Ticket ticket = supportRepository.findByTitle(ticketId).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+            if (currentUser.getRoles().contains(Role.CLIENT) && !ticket.getIssuer().equals(currentUser)) {
+                throw new MyException("You cannot download someone else's attachment", HttpStatus.BAD_REQUEST);
+            }
+            String baseDir = ticketAttachmentUploadBaseDirectory + "user_" + ticket.getIssuer().getId() + "/" + ticketId + "/";
             String targetPath = baseDir + attachmentPath;
             Path path = Path.of(targetPath);
             return new AttachmentDownloadDto(Files.probeContentType(path), Files.readAllBytes(path));
@@ -191,15 +209,53 @@ public class SupportService {
     }
 
     @Transactional
-    public String createComment(TicketCommentCreateDto ticketCommentCreateDto) {
-        Ticket ticket = supportRepository.findById(ticketCommentCreateDto.getTicketId()).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+    public String createComment(Integer ticketId, String content, MultipartFile[] files) {
+        User currentUser = userService.getCurrentUser();
+        Ticket ticket = supportRepository.findById(ticketId).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+        if (currentUser.getRoles().contains(Role.CLIENT) && !ticket.getIssuer().equals(currentUser)) {
+            throw new MyException("You cannot comment on someone else's ticket", HttpStatus.BAD_REQUEST);
+        }
+        if (ticket.isClosed()) {
+            throw new MyException("Ticket is closed", HttpStatus.BAD_REQUEST);
+        }
+        Hibernate.initialize(ticket.getComments());
         TicketComment ticketComment = new TicketComment(
-                ticketCommentCreateDto.getContent(),
-                userService.getCurrentUser()
+                "Comment-" + RandomStringUtils.random(8, "0123456789abcdef"),
+                content,
+                currentUser
         );
+        List<String> savedFileNames = uploadAttachments(files, ticket.getIssuer().getId(), ticket.getTitle(), ticketComment.getTitle());
+        ticketComment.setAttachmentPaths(savedFileNames);
         ticket.getComments().add(ticketComment);
         supportRepository.save(ticket);
         return "Successfully posted comment";
+    }
+
+    public AttachmentDownloadDto downloadTicketCommentAttachment(String ticketId, String commentId, String attachmentPath) {
+        try {
+            User currentUser = userService.getCurrentUser();
+            Ticket ticket = supportRepository.findByTitle(ticketId).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+            if (currentUser.getRoles().contains(Role.CLIENT) && !ticket.getIssuer().equals(currentUser)) {
+                throw new MyException("You cannot download someone else's attachment", HttpStatus.BAD_REQUEST);
+            }
+            String baseDir = ticketAttachmentUploadBaseDirectory + "user_" + ticket.getIssuer().getId() + "/" + ticketId + "/" + commentId + "/";
+            String targetPath = baseDir + attachmentPath;
+            Path path = Path.of(targetPath);
+            return new AttachmentDownloadDto(Files.probeContentType(path), Files.readAllBytes(path));
+        } catch (IOException e) {
+            throw new MyException("Could not download ticket attachment", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public Integer createAnonymousTicket(TicketCreateDto ticketCreateDto) {
+        Ticket ticket = new Ticket(
+                "Ticket-" + RandomStringUtils.random(8, "0123456789abcdef"),
+                ticketCreateDto.getContent(),
+                null,
+                ticketCreateDto.getIssuerEmail()
+        );
+        supportRepository.save(ticket);
+        return ticket.getId();
     }
 
 }

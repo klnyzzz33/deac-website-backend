@@ -20,20 +20,30 @@ public class SupportController {
         this.supportService = supportService;
     }
 
-    @GetMapping("/api/admin/support/ticket/list")
+    @PostMapping("/api/admin/support/ticket/list")
     public List<TicketInfoDto> listTickets(@RequestParam(name = "pageNumber") int pageNumber,
                                            @RequestParam(name = "entriesPerPage") int entriesPerPage) {
         return supportService.listTickets(pageNumber, entriesPerPage);
     }
 
+    @GetMapping("/api/admin/support/ticket/count")
+    public Long getNumberOfTickets() {
+        return supportService.getNumberOfTickets();
+    }
+
     @PostMapping("/api/admin/support/ticket/close")
-    public ResponseMessage closeTicket(@RequestBody Integer ticketId) {
-        return new ResponseMessage(supportService.closeTicket(ticketId));
+    public ResponseMessage closeTicket(@RequestBody Integer ticketId, @RequestParam(name = "value") boolean value) {
+        return new ResponseMessage(supportService.closeTicket(ticketId, value));
     }
 
     @PostMapping("/api/admin/support/ticket/delete")
     public ResponseMessage deleteTicket(@RequestBody Integer ticketId) {
         return new ResponseMessage(supportService.deleteTicket(ticketId));
+    }
+
+    @PostMapping("/api/admin/support/ticket/comment/delete")
+    public ResponseMessage deleteComment(@RequestParam(name = "ticketId") Integer ticketId, @RequestBody Integer commentId) {
+        return new ResponseMessage(supportService.deleteComment(ticketId, commentId));
     }
 
     @PostMapping("/api/support/ticket/create")
@@ -43,13 +53,13 @@ public class SupportController {
     }
 
     @PostMapping("/api/support/ticket/list")
-    public List<TicketInfoDto> listUserTickets(@RequestParam(name = "pageNumber") int pageNumber,
-                                               @RequestParam(name = "entriesPerPage") int entriesPerPage) {
+    public List<TicketInfoDto> listCurrentUserTickets(@RequestParam(name = "pageNumber") int pageNumber,
+                                                      @RequestParam(name = "entriesPerPage") int entriesPerPage) {
         return supportService.listCurrentUserTickets(pageNumber, entriesPerPage);
     }
 
     @GetMapping("/api/support/ticket/count")
-    public Long getNumberOfUserTickets() {
+    public Long getNumberOfCurrentUserTickets() {
         return supportService.getNumberOfCurrentUserTickets();
     }
 
@@ -59,9 +69,9 @@ public class SupportController {
     }
 
     @PostMapping("/api/support/ticket/download")
-    public ResponseEntity<byte[]> createComment(@RequestParam(name = "ticketId") String ticketId,
-                                                @RequestParam(name = "attachmentPath") String attachmentPath) {
-        AttachmentDownloadDto fileInfo = supportService.downloadCurrentUserTicketAttachment(ticketId, attachmentPath);
+    public ResponseEntity<byte[]> downloadTicketAttachment(@RequestParam(name = "ticketId") String ticketId,
+                                                           @RequestParam(name = "attachmentPath") String attachmentPath) {
+        AttachmentDownloadDto fileInfo = supportService.downloadTicketAttachment(ticketId, attachmentPath);
         return ResponseEntity.ok()
                 .contentLength(fileInfo.getData().length)
                 .header("Content-Type", fileInfo.getType())
@@ -69,8 +79,21 @@ public class SupportController {
     }
 
     @PostMapping("/api/support/ticket/comment")
-    public ResponseMessage createComment(@RequestBody TicketCommentCreateDto ticketCommentCreateDto) {
-        return new ResponseMessage(supportService.createComment(ticketCommentCreateDto));
+    public ResponseMessage createComment(@RequestParam(name = "ticketId") Integer ticketId,
+                                         @RequestParam(name = "content") String content,
+                                         @RequestParam(name = "file", required = false) MultipartFile[] files) {
+        return new ResponseMessage(supportService.createComment(ticketId, content, files));
+    }
+
+    @PostMapping("/api/support/ticket/comment/download")
+    public ResponseEntity<byte[]> downloadTicketCommentAttachment(@RequestParam(name = "ticketId") String ticketId,
+                                                                  @RequestParam(name = "commentId") String commentId,
+                                                                  @RequestParam(name = "attachmentPath") String attachmentPath) {
+        AttachmentDownloadDto fileInfo = supportService.downloadTicketCommentAttachment(ticketId, commentId, attachmentPath);
+        return ResponseEntity.ok()
+                .contentLength(fileInfo.getData().length)
+                .header("Content-Type", fileInfo.getType())
+                .body(fileInfo.getData());
     }
 
     @PostMapping("/api/support/ticket/create_anonymous")

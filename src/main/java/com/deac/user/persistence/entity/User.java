@@ -2,11 +2,16 @@ package com.deac.user.persistence.entity;
 
 import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.support.persistence.entity.Ticket;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.hibernate.Hibernate;
 
 import javax.persistence.*;
 import javax.validation.constraints.Size;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Getter
@@ -63,6 +68,19 @@ public class User {
         this.roles = roles;
         this.isVerified = false;
         this.isEnabled = false;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
+        User user = (User) o;
+        return id != null && Objects.equals(id, user.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
     }
 
 }
