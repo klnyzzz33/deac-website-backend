@@ -16,8 +16,16 @@ public interface SupportRepository extends JpaRepository<Ticket, Integer> {
 
     List<Ticket> findBy(Pageable pageable);
 
+    List<Ticket> findByClosed(Boolean closed, Pageable pageable);
+
     List<Ticket> findByIssuer(User issuer, Pageable pageable);
 
+    List<Ticket> findByIssuerAndClosed(User issuer, Boolean closed, Pageable pageable);
+
+    Long countAllByClosed(boolean closed);
+
     Long countByIssuer(User issuer);
+
+    Long countAllByIssuerAndClosed(User issuer, boolean closed);
 
 }

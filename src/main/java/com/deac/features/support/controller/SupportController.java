@@ -22,13 +22,14 @@ public class SupportController {
 
     @PostMapping("/api/admin/support/ticket/list")
     public List<TicketInfoDto> listTickets(@RequestParam(name = "pageNumber") int pageNumber,
-                                           @RequestParam(name = "entriesPerPage") int entriesPerPage) {
-        return supportService.listTickets(pageNumber, entriesPerPage);
+                                           @RequestParam(name = "entriesPerPage") int entriesPerPage,
+                                           @RequestParam(name = "filterTicketStatus", required = false) Boolean filterTicketStatus) {
+        return supportService.listTickets(pageNumber, entriesPerPage, filterTicketStatus);
     }
 
     @GetMapping("/api/admin/support/ticket/count")
-    public Long getNumberOfTickets() {
-        return supportService.getNumberOfTickets();
+    public Long getNumberOfTickets(@RequestParam(name = "filterTicketStatus", required = false) Boolean filterTicketStatus) {
+        return supportService.getNumberOfTickets(filterTicketStatus);
     }
 
     @PostMapping("/api/admin/support/ticket/close")
@@ -54,13 +55,14 @@ public class SupportController {
 
     @PostMapping("/api/support/ticket/list")
     public List<TicketInfoDto> listCurrentUserTickets(@RequestParam(name = "pageNumber") int pageNumber,
-                                                      @RequestParam(name = "entriesPerPage") int entriesPerPage) {
-        return supportService.listCurrentUserTickets(pageNumber, entriesPerPage);
+                                                      @RequestParam(name = "entriesPerPage") int entriesPerPage,
+                                                      @RequestParam(name = "filterTicketStatus", required = false) Boolean filterTicketStatus) {
+        return supportService.listCurrentUserTickets(pageNumber, entriesPerPage, filterTicketStatus);
     }
 
     @GetMapping("/api/support/ticket/count")
-    public Long getNumberOfCurrentUserTickets() {
-        return supportService.getNumberOfCurrentUserTickets();
+    public Long getNumberOfCurrentUserTickets(@RequestParam(name = "filterTicketStatus", required = false) Boolean filterTicketStatus) {
+        return supportService.getNumberOfCurrentUserTickets(filterTicketStatus);
     }
 
     @GetMapping("/api/support/ticket/open")

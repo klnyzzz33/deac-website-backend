@@ -42,12 +42,16 @@ public class SupportService {
         ticketAttachmentUploadBaseDirectory = Objects.requireNonNull(environment.getProperty("file.tickets.rootdir", String.class));
     }
 
-    public List<TicketInfoDto> listTickets(int pageNumber, int pageSize) {
-        return listTicketsHelper(pageNumber, pageSize, null);
+    public List<TicketInfoDto> listTickets(int pageNumber, int pageSize, Boolean filterTicketStatus) {
+        return listTicketsHelper(pageNumber, pageSize, null, filterTicketStatus);
     }
 
-    public Long getNumberOfTickets() {
-        return supportRepository.count();
+    public Long getNumberOfTickets(Boolean filterTicketStatus) {
+        if (filterTicketStatus == null) {
+            return supportRepository.count();
+        } else {
+            return supportRepository.countAllByClosed(filterTicketStatus);
+        }
     }
 
     public String closeTicket(Integer ticketId, boolean value) {
@@ -120,18 +124,26 @@ public class SupportService {
         }
     }
 
-    public List<TicketInfoDto> listCurrentUserTickets(int pageNumber, int pageSize) {
+    public List<TicketInfoDto> listCurrentUserTickets(int pageNumber, int pageSize, Boolean filterTicketStatus) {
         User currentUser = userService.getCurrentUser();
-        return listTicketsHelper(pageNumber, pageSize, currentUser);
+        return listTicketsHelper(pageNumber, pageSize, currentUser, filterTicketStatus);
     }
 
-    private List<TicketInfoDto> listTicketsHelper(int pageNumber, int pageSize, User user) {
+    private List<TicketInfoDto> listTicketsHelper(int pageNumber, int pageSize, User user, Boolean filterTicketStatus) {
         Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
         List<Ticket> tickets;
         if (user == null) {
-            tickets = supportRepository.findBy(sortedByCreateDateDesc);
+            if (filterTicketStatus == null) {
+                tickets = supportRepository.findBy(sortedByCreateDateDesc);
+            } else {
+                tickets = supportRepository.findByClosed(filterTicketStatus, sortedByCreateDateDesc);
+            }
         } else {
-            tickets = supportRepository.findByIssuer(user, sortedByCreateDateDesc);
+            if (filterTicketStatus == null) {
+                tickets = supportRepository.findByIssuer(user, sortedByCreateDateDesc);
+            } else {
+                tickets = supportRepository.findByIssuerAndClosed(user, filterTicketStatus, sortedByCreateDateDesc);
+            }
         }
         return ticketListToTicketInfoDtoList(tickets);
     }
@@ -149,9 +161,13 @@ public class SupportService {
                 .collect(Collectors.toList());
     }
 
-    public Long getNumberOfCurrentUserTickets() {
+    public Long getNumberOfCurrentUserTickets(Boolean filterTicketStatus) {
         User currentUser = userService.getCurrentUser();
-        return supportRepository.countByIssuer(currentUser);
+        if (filterTicketStatus == null) {
+            return supportRepository.countByIssuer(currentUser);
+        } else {
+            return supportRepository.countAllByIssuerAndClosed(currentUser, filterTicketStatus);
+        }
     }
 
     @Transactional
