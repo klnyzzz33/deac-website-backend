@@ -68,9 +68,21 @@ public class NewsController {
         return newsService.getLatestNewsWithExcluded(entriesPerPage, excludedId);
     }
 
+    @GetMapping("/api/news/list/author")
+    public List<NewsInfoDto> listNewsByAuthor(@RequestParam(name = "author") String author,
+                                              @RequestParam(name = "pageNumber") int pageNumber,
+                                              @RequestParam(name = "entriesPerPage") int entriesPerPage) {
+        return newsService.listNewsByAuthor(author, pageNumber, entriesPerPage);
+    }
+
     @GetMapping("/api/news/count")
     public Long getNumberOfNews() {
         return newsService.getNumberOfNews();
+    }
+
+    @GetMapping("/api/news/count/author")
+    public Long getNumberOfNewsByAuthor(@RequestParam(name = "author") String author) {
+        return newsService.getNumberOfNewsByAuthor(author);
     }
 
     @GetMapping("/api/news/open")

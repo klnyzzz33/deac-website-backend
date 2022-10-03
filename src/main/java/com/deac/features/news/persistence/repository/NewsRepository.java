@@ -15,7 +15,11 @@ public interface NewsRepository extends JpaRepository<News, Integer> {
 
     List<News> findBy(Pageable pageable);
 
+    List<News> findByAuthorId(Integer authorId, Pageable pageable);
+
     List<News> findByIdNot(int excludedId, Pageable pageable);
+
+    long countByAuthorId(Integer authorId);
 
     @Query("SELECT count(n) FROM News n WHERE n.id IN :ids")
     Integer findExistingMatchingNewsCount(List<Integer> ids);

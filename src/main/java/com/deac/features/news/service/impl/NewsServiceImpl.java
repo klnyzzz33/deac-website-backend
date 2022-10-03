@@ -8,7 +8,6 @@ import com.deac.features.news.persistence.entity.News;
 import com.deac.features.news.persistence.repository.NewsRepository;
 import com.deac.features.news.service.NewsService;
 import com.deac.exception.MyException;
-import com.deac.misc.RandomStringHelper;
 import com.deac.user.service.UserService;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -158,6 +157,14 @@ public class NewsServiceImpl implements NewsService {
 
     }
 
+    @Override
+    public List<NewsInfoDto> listNewsByAuthor(String author, int pageNumber, int pageSize) {
+        Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
+        Integer userId = userService.getUserByUsername(author).getId();
+        List<News> newsList = newsRepository.findByAuthorId(userId, sortedByCreateDateDesc);
+        return newsListToNewsInfoDtoList(newsList);
+    }
+
     private List<NewsInfoDto> newsListToNewsInfoDtoList(List<News> newsList) {
         return newsList
                 .stream()
@@ -178,6 +185,12 @@ public class NewsServiceImpl implements NewsService {
     @Override
     public long getNumberOfNews() {
         return newsRepository.count();
+    }
+
+    @Override
+    public long getNumberOfNewsByAuthor(String author) {
+        Integer userId = userService.getUserByUsername(author).getId();
+        return newsRepository.countByAuthorId(userId);
     }
 
     @Override

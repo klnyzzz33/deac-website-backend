@@ -24,7 +24,11 @@ public interface NewsService {
 
     List<NewsInfoDto> getLatestNewsWithExcluded(int pageSize, int excludedId);
 
+    List<NewsInfoDto> listNewsByAuthor(String author, int pageNumber, int entriesPerPage);
+
     long getNumberOfNews();
+
+    long getNumberOfNewsByAuthor(String author);
 
     NewsInfoDto getSingleNews(Integer id);
 
