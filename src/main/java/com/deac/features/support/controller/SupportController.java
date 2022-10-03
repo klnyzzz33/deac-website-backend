@@ -47,6 +47,18 @@ public class SupportController {
         return new ResponseMessage(supportService.deleteComment(ticketId, commentId));
     }
 
+    @GetMapping("/api/admin/support/ticket/search")
+    public List<TicketInfoDto> searchTicket(@RequestParam(name = "pageNumber") int pageNumber,
+                                      @RequestParam(name = "entriesPerPage") int entriesPerPage,
+                                      @RequestParam(name = "searchTerm") String searchTerm) {
+        return supportService.searchTicket(pageNumber, entriesPerPage, searchTerm);
+    }
+
+    @GetMapping("/api/admin/support/ticket/search/count")
+    public Long getNumberOfSearchResults(@RequestParam(name = "searchTerm") String searchTerm) {
+        return supportService.getNumberOfSearchResults(searchTerm);
+    }
+
     @PostMapping("/api/support/ticket/create")
     public Integer createTicket(@RequestParam(name = "content") String content,
                                 @RequestParam(name = "file", required = false) MultipartFile[] files) {

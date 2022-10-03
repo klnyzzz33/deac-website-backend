@@ -4,7 +4,6 @@ import com.deac.user.persistence.entity.User;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.GrantedAuthority;
 
-import javax.mail.MessagingException;
 import javax.servlet.http.HttpServletResponse;
 import java.util.Collection;
 import java.util.Map;
@@ -28,6 +27,8 @@ public interface UserService {
     String getUser(Integer userId);
 
     User getUserByUsername(String username);
+
+    User getUserByUsernameOrEmail(String searchTerm);
 
     User getCurrentUser();
 

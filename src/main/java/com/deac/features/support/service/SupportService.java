@@ -85,6 +85,22 @@ public class SupportService {
         return "Successfully deleted comment";
     }
 
+    public List<TicketInfoDto> searchTicket(int pageNumber, int pageSize, String searchTerm) {
+        User user = userService.getUserByUsernameOrEmail(searchTerm);
+        if (user == null || user.getRoles().contains(Role.ADMIN)) {
+            return List.of();
+        }
+        return listTicketsHelper(pageNumber, pageSize, user, null);
+    }
+
+    public Long getNumberOfSearchResults(String searchTerm) {
+        User user = userService.getUserByUsernameOrEmail(searchTerm);
+        if (user == null || user.getRoles().contains(Role.ADMIN)) {
+            return 0L;
+        }
+        return supportRepository.countByIssuer(user);
+    }
+
     public Integer createTicket(String content, MultipartFile[] files) {
         User currentUser = userService.getCurrentUser();
         if (currentUser.getRoles().contains(Role.ADMIN)) {

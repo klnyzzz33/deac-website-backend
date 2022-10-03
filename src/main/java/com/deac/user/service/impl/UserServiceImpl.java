@@ -226,6 +226,18 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
+    public User getUserByUsernameOrEmail(String searchTerm) {
+        Optional<User> userOptional = userRepository.findByUsername(searchTerm);
+        if (userOptional.isEmpty()) {
+            userOptional = userRepository.findByEmail(searchTerm);
+            if (userOptional.isEmpty()) {
+                return null;
+            }
+        }
+        return userOptional.get();
+    }
+
+    @Override
     public User getCurrentUser() {
         Optional<User> user = userRepository.findByUsername(getCurrentUsername());
         if (user.isEmpty()) {
