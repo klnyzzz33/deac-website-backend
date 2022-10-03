@@ -49,8 +49,8 @@ public class SupportController {
 
     @GetMapping("/api/admin/support/ticket/search")
     public List<TicketInfoDto> searchTicket(@RequestParam(name = "pageNumber") int pageNumber,
-                                      @RequestParam(name = "entriesPerPage") int entriesPerPage,
-                                      @RequestParam(name = "searchTerm") String searchTerm) {
+                                            @RequestParam(name = "entriesPerPage") int entriesPerPage,
+                                            @RequestParam(name = "searchTerm") String searchTerm) {
         return supportService.searchTicket(pageNumber, entriesPerPage, searchTerm);
     }
 
@@ -111,8 +111,8 @@ public class SupportController {
     }
 
     @PostMapping("/api/support/ticket/create_anonymous")
-    public Integer createAnonymousTicket(@RequestBody TicketCreateDto ticketCreateDto) {
-        return supportService.createAnonymousTicket(ticketCreateDto);
+    public ResponseMessage createAnonymousTicket(@RequestBody TicketCreateDto ticketCreateDto) {
+        return new ResponseMessage(supportService.createAnonymousTicket(ticketCreateDto));
     }
 
 }

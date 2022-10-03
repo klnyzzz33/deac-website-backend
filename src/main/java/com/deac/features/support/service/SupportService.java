@@ -42,6 +42,6 @@ public interface SupportService {
 
     AttachmentDownloadDto downloadTicketCommentAttachment(String ticketId, String commentId, String attachmentPath);
 
-    Integer createAnonymousTicket(TicketCreateDto ticketCreateDto);
+    String createAnonymousTicket(TicketCreateDto ticketCreateDto);
 
 }

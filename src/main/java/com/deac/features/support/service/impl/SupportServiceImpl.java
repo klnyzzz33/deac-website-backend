@@ -6,6 +6,7 @@ import com.deac.features.support.persistence.entity.Ticket;
 import com.deac.features.support.persistence.entity.TicketComment;
 import com.deac.features.support.persistence.repository.SupportRepository;
 import com.deac.features.support.service.SupportService;
+import com.deac.mail.EmailService;
 import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.mail.MessagingException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,18 +36,21 @@ public class SupportServiceImpl implements SupportService {
 
     private final UserService userService;
 
+    private final EmailService emailService;
+
     private final String ticketAttachmentUploadBaseDirectory;
 
     @Autowired
-    public SupportServiceImpl(SupportRepository supportRepository, UserService userService, Environment environment) {
+    public SupportServiceImpl(SupportRepository supportRepository, UserService userService, EmailService emailService, Environment environment) {
         this.supportRepository = supportRepository;
         this.userService = userService;
+        this.emailService = emailService;
         ticketAttachmentUploadBaseDirectory = Objects.requireNonNull(environment.getProperty("file.tickets.rootdir", String.class));
     }
 
     @Override
     public List<TicketInfoDto> listTickets(int pageNumber, int pageSize, Boolean filterTicketStatus) {
-        return listTicketsHelper(pageNumber, pageSize, null, filterTicketStatus);
+        return listTicketsHelper(pageNumber, pageSize, null, filterTicketStatus, false);
     }
 
     @Override
@@ -60,6 +65,9 @@ public class SupportServiceImpl implements SupportService {
     @Override
     public String closeTicket(Integer ticketId, boolean value) {
         Ticket ticket = supportRepository.findById(ticketId).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+        if (ticket.getIssuer() == null && ticket.isClosed() && !value) {
+            throw new MyException("Anonymous tickets cannot be reopened", HttpStatus.BAD_REQUEST);
+        }
         ticket.setClosed(value);
         supportRepository.save(ticket);
         return "Ticket status: " + (!value ? "closed" : "open") + " -> " + (value ? "closed" : "open");
@@ -93,15 +101,21 @@ public class SupportServiceImpl implements SupportService {
 
     @Override
     public List<TicketInfoDto> searchTicket(int pageNumber, int pageSize, String searchTerm) {
+        if ("Anonymous".equals(searchTerm)) {
+            return listTicketsHelper(pageNumber, pageSize, null, null, true);
+        }
         User user = userService.getUserByUsernameOrEmail(searchTerm);
         if (user == null || user.getRoles().contains(Role.ADMIN)) {
             return List.of();
         }
-        return listTicketsHelper(pageNumber, pageSize, user, null);
+        return listTicketsHelper(pageNumber, pageSize, user, null, false);
     }
 
     @Override
     public Long getNumberOfSearchResults(String searchTerm) {
+        if ("Anonymous".equals(searchTerm)) {
+            return supportRepository.countByIssuerIsNull();
+        }
         User user = userService.getUserByUsernameOrEmail(searchTerm);
         if (user == null || user.getRoles().contains(Role.ADMIN)) {
             return 0L;
@@ -132,7 +146,12 @@ public class SupportServiceImpl implements SupportService {
 
     private List<String> uploadAttachments(MultipartFile[] files, Integer userId, String ticketId, String commentId) {
         try {
-            String baseDir = ticketAttachmentUploadBaseDirectory + "user_" + userId + "/" + ticketId + "/" + (commentId != null ? (commentId + "/") : "");
+            String baseDir;
+            if (userId != null) {
+                baseDir = ticketAttachmentUploadBaseDirectory + "user_" + userId + "/" + ticketId + "/" + (commentId != null ? (commentId + "/") : "");
+            } else {
+                baseDir = ticketAttachmentUploadBaseDirectory + "anonymous/" + ticketId + "/" + (commentId != null ? (commentId + "/") : "");
+            }
             List<String> savedFileNames = new ArrayList<>();
             for (MultipartFile file : files) {
                 if (!Objects.requireNonNull(file.getContentType()).startsWith("image/") && !file.getContentType().startsWith("application/pdf")) {
@@ -152,15 +171,19 @@ public class SupportServiceImpl implements SupportService {
     @Override
     public List<TicketInfoDto> listCurrentUserTickets(int pageNumber, int pageSize, Boolean filterTicketStatus) {
         User currentUser = userService.getCurrentUser();
-        return listTicketsHelper(pageNumber, pageSize, currentUser, filterTicketStatus);
+        return listTicketsHelper(pageNumber, pageSize, currentUser, filterTicketStatus, false);
     }
 
-    private List<TicketInfoDto> listTicketsHelper(int pageNumber, int pageSize, User user, Boolean filterTicketStatus) {
+    private List<TicketInfoDto> listTicketsHelper(int pageNumber, int pageSize, User user, Boolean filterTicketStatus, boolean anonymous) {
         Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
         List<Ticket> tickets;
         if (user == null) {
             if (filterTicketStatus == null) {
-                tickets = supportRepository.findBy(sortedByCreateDateDesc);
+                if (!anonymous) {
+                    tickets = supportRepository.findBy(sortedByCreateDateDesc);
+                } else {
+                    tickets = supportRepository.findByIssuerIsNull(sortedByCreateDateDesc);
+                }
             } else {
                 tickets = supportRepository.findByClosed(filterTicketStatus, sortedByCreateDateDesc);
             }
@@ -176,14 +199,17 @@ public class SupportServiceImpl implements SupportService {
 
     private List<TicketInfoDto> ticketListToTicketInfoDtoList(List<Ticket> tickets) {
         return tickets.stream()
-                .map(ticket -> new TicketInfoDto(
-                        ticket.getId(),
-                        ticket.getTitle(),
-                        ticket.getContent(),
-                        ticket.getIssuer().getUsername(),
-                        ticket.getCreateDate(),
-                        ticket.isClosed()
-                ))
+                .map(ticket -> {
+                    User issuer = ticket.getIssuer();
+                    return new TicketInfoDto(
+                            ticket.getId(),
+                            ticket.getTitle(),
+                            ticket.getContent(),
+                            (issuer != null ? ticket.getIssuer().getUsername() : "Anonymous"),
+                            ticket.getCreateDate(),
+                            ticket.isClosed()
+                    );
+                })
                 .collect(Collectors.toList());
     }
 
@@ -207,11 +233,12 @@ public class SupportServiceImpl implements SupportService {
         }
         Hibernate.initialize(ticket.getAttachmentPaths());
         Hibernate.initialize(ticket.getComments());
+        User issuer = ticket.getIssuer();
         return new TicketDetailInfoDto(
                 ticket.getId(),
                 ticket.getTitle(),
                 ticket.getContent(),
-                ticket.getIssuer().getUsername(),
+                (issuer != null ? ticket.getIssuer().getUsername() : "Anonymous"),
                 ticket.getCreateDate(),
                 ticket.isClosed(),
                 ticket.getAttachmentPaths(),
@@ -223,11 +250,12 @@ public class SupportServiceImpl implements SupportService {
         return comments.stream()
                 .map(ticketComment -> {
                     Hibernate.initialize(ticketComment.getAttachmentPaths());
+                    User issuer = ticketComment.getIssuer();
                     return new TicketCommentDto(
                             ticketComment.getId(),
                             ticketComment.getTitle(),
                             ticketComment.getContent(),
-                            ticketComment.getIssuer().getUsername(),
+                            (issuer != null ? ticketComment.getIssuer().getUsername() : "Anonymous"),
                             ticketComment.getCreateDate(),
                             ticketComment.getAttachmentPaths()
                     );
@@ -270,7 +298,20 @@ public class SupportServiceImpl implements SupportService {
                 content,
                 currentUser
         );
-        List<String> savedFileNames = uploadAttachments(files, ticket.getIssuer().getId(), ticket.getTitle(), ticketComment.getTitle());
+        List<String> savedFileNames;
+        if (ticket.getIssuer() == null) {
+            savedFileNames = uploadAttachments(files, null, ticket.getTitle(), ticketComment.getTitle());
+            ticket.setClosed(true);
+            try {
+                emailService.sendMessage(ticket.getIssuerEmail(),
+                        "#" + ticket.getTitle(),
+                        "<h3>Dear Sir/Madam,<br>our support has reviewed and answered your issue:</h3><hr><b>You</b> originally asked:<br>``` " + ticket.getContent() + " ```<br><br><b>" + currentUser.getUsername() + "</b> said:<br>``` " + ticketComment.getContent() + " ```<br>If you have any more questions/problems, reply to this email.<br>Regards,<br><b>DEAC Kyokushin Karate Support Staff</b>",
+                        List.of());
+            } catch (MessagingException ignored) {
+            }
+        } else {
+            savedFileNames = uploadAttachments(files, ticket.getIssuer().getId(), ticket.getTitle(), ticketComment.getTitle());
+        }
         ticketComment.setAttachmentPaths(savedFileNames);
         ticket.getComments().add(ticketComment);
         supportRepository.save(ticket);
@@ -285,7 +326,12 @@ public class SupportServiceImpl implements SupportService {
             if (currentUser.getRoles().contains(Role.CLIENT) && !ticket.getIssuer().equals(currentUser)) {
                 throw new MyException("You cannot download someone else's attachment", HttpStatus.BAD_REQUEST);
             }
-            String baseDir = ticketAttachmentUploadBaseDirectory + "user_" + ticket.getIssuer().getId() + "/" + ticketId + "/" + commentId + "/";
+            String baseDir;
+            if (ticket.getIssuer() != null) {
+                baseDir = ticketAttachmentUploadBaseDirectory + "user_" + ticket.getIssuer().getId() + "/" + ticketId + "/" + commentId + "/";
+            } else {
+                baseDir = ticketAttachmentUploadBaseDirectory + "anonymous/" + ticketId + "/" + commentId + "/";
+            }
             String targetPath = baseDir + attachmentPath;
             Path path = Path.of(targetPath);
             return new AttachmentDownloadDto(Files.probeContentType(path), Files.readAllBytes(path));
@@ -295,7 +341,7 @@ public class SupportServiceImpl implements SupportService {
     }
 
     @Override
-    public Integer createAnonymousTicket(TicketCreateDto ticketCreateDto) {
+    public String createAnonymousTicket(TicketCreateDto ticketCreateDto) {
         Ticket ticket = new Ticket(
                 "Ticket-" + RandomStringUtils.random(8, "0123456789abcdef"),
                 ticketCreateDto.getContent(),
@@ -303,7 +349,7 @@ public class SupportServiceImpl implements SupportService {
                 ticketCreateDto.getIssuerEmail()
         );
         supportRepository.save(ticket);
-        return ticket.getId();
+        return "Successfully created anonymous ticket";
     }
 
 }

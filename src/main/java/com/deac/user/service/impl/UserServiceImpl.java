@@ -130,6 +130,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             if (userRepository.existsByUsername(user.getUsername()) || userRepository.existsByEmail(user.getEmail())) {
                 throw new MyException("Username or email already exists", HttpStatus.CONFLICT);
             }
+            if ("Anonymous".equals(user.getUsername())) {
+                throw new MyException("Username not allowed", HttpStatus.BAD_REQUEST);
+            }
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             user.setRoles(List.of(Role.CLIENT));
             user.setEnabled(true);
