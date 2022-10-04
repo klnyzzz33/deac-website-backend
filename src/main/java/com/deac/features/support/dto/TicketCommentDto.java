@@ -24,4 +24,6 @@ public class TicketCommentDto {
 
     private List<String> attachments;
 
+    private boolean viewed;
+
 }

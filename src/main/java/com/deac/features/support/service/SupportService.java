@@ -26,6 +26,10 @@ public interface SupportService {
 
     Long getNumberOfSearchResults(String searchTerm);
 
+    Long getAdminNumberOfUnopenedTickets();
+
+    String markTicketAsRead(Integer ticketId);
+
     Integer createTicket(String content, MultipartFile[] files);
 
     List<TicketInfoDto> listCurrentUserTickets(int pageNumber, int pageSize, Boolean filterTicketStatus);
@@ -41,6 +45,10 @@ public interface SupportService {
     String createComment(Integer ticketId, String content, MultipartFile[] files);
 
     AttachmentDownloadDto downloadTicketCommentAttachment(String ticketId, String commentId, String attachmentPath);
+
+    Long getClientNumberOfCommentNotifications();
+
+    String markCommentsAsRead(Integer ticketId);
 
     String createAnonymousTicket(TicketCreateDto ticketCreateDto);
 

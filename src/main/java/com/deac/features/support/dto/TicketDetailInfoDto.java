@@ -28,4 +28,6 @@ public class TicketDetailInfoDto {
 
     private List<TicketCommentDto> comments;
 
+    private boolean viewed;
+
 }

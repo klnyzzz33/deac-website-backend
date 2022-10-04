@@ -8,7 +8,6 @@ import lombok.ToString;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import javax.persistence.*;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -46,9 +45,15 @@ public class Ticket {
     @ElementCollection(fetch = FetchType.LAZY)
     private List<String> attachmentPaths;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, targetEntity = TicketComment.class)
     @ToString.Exclude
     private List<TicketComment> comments;
+
+    @DateTimeFormat(pattern = "yyyy.MM.dd")
+    private Date updateDate = new Date();
+
+    @Column(nullable = false)
+    private boolean viewed = false;
 
     public Ticket(String title, String content, User issuer, String issuerEmail) {
         this.title = title;

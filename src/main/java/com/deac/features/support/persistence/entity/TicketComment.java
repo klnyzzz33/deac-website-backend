@@ -40,6 +40,9 @@ public class TicketComment {
     @ElementCollection(fetch = FetchType.LAZY)
     private List<String> attachmentPaths;
 
+    @Column(nullable = false)
+    private boolean viewed = false;
+
     public TicketComment(String title, String content, User issuer) {
         this.title = title;
         this.content = content;

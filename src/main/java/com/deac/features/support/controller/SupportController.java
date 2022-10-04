@@ -59,6 +59,16 @@ public class SupportController {
         return supportService.getNumberOfSearchResults(searchTerm);
     }
 
+    @GetMapping("/api/admin/support/ticket/notifications")
+    public Long getAdminNumberOfUnopenedTickets() {
+        return supportService.getAdminNumberOfUnopenedTickets();
+    }
+
+    @PostMapping("/api/admin/support/ticket/read")
+    public ResponseMessage markTicketAsRead(@RequestBody Integer ticketId) {
+        return new ResponseMessage(supportService.markTicketAsRead(ticketId));
+    }
+
     @PostMapping("/api/support/ticket/create")
     public Integer createTicket(@RequestParam(name = "content") String content,
                                 @RequestParam(name = "file", required = false) MultipartFile[] files) {
@@ -108,6 +118,16 @@ public class SupportController {
                 .contentLength(fileInfo.getData().length)
                 .header("Content-Type", fileInfo.getType())
                 .body(fileInfo.getData());
+    }
+
+    @GetMapping("/api/support/ticket/notifications")
+    public Long getClientNumberOfCommentNotifications() {
+        return supportService.getClientNumberOfCommentNotifications();
+    }
+
+    @PostMapping("/api/support/ticket/comment/read")
+    public ResponseMessage markCommentsAsRead(@RequestBody Integer ticketId) {
+        return new ResponseMessage(supportService.markCommentsAsRead(ticketId));
     }
 
     @PostMapping("/api/support/ticket/create_anonymous")

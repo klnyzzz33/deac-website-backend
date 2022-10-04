@@ -74,8 +74,10 @@ public class SupportServiceImpl implements SupportService {
     }
 
     @Override
+    @Transactional
     public List<TicketInfoDto> listTickets(int pageNumber, int pageSize, Boolean filterTicketStatus) {
-        return listTicketsHelper(pageNumber, pageSize, null, filterTicketStatus, false);
+        User currentUser = userService.getCurrentUser();
+        return listTicketsHelper(pageNumber, pageSize, null, filterTicketStatus, false, currentUser);
     }
 
     @Override
@@ -94,6 +96,7 @@ public class SupportServiceImpl implements SupportService {
             throw new MyException("Anonymous tickets cannot be reopened", HttpStatus.BAD_REQUEST);
         }
         ticket.setClosed(value);
+        ticket.setUpdateDate(new Date());
         supportRepository.save(ticket);
         return "Ticket status: " + (!value ? "closed" : "open") + " -> " + (value ? "closed" : "open");
     }
@@ -125,15 +128,17 @@ public class SupportServiceImpl implements SupportService {
     }
 
     @Override
+    @Transactional
     public List<TicketInfoDto> searchTicket(int pageNumber, int pageSize, String searchTerm) {
+        User currentUser = userService.getCurrentUser();
         if ("Anonymous".equals(searchTerm)) {
-            return listTicketsHelper(pageNumber, pageSize, null, null, true);
+            return listTicketsHelper(pageNumber, pageSize, null, null, true, currentUser);
         }
         User user = userService.getUserByUsernameOrEmail(searchTerm);
         if (user == null || user.getRoles().contains(Role.ADMIN)) {
             return List.of();
         }
-        return listTicketsHelper(pageNumber, pageSize, user, null, false);
+        return listTicketsHelper(pageNumber, pageSize, user, null, false, currentUser);
     }
 
     @Override
@@ -146,6 +151,22 @@ public class SupportServiceImpl implements SupportService {
             return 0L;
         }
         return supportRepository.countByIssuer(user);
+    }
+
+    @Override
+    public Long getAdminNumberOfUnopenedTickets() {
+        return supportRepository.countByViewed(false);
+    }
+
+    @Override
+    public String markTicketAsRead(Integer ticketId) {
+        Ticket ticket = supportRepository.findById(ticketId).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+        if (ticket.isViewed()) {
+            throw new MyException("Ticket already viewed", HttpStatus.BAD_REQUEST);
+        }
+        ticket.setViewed(true);
+        supportRepository.save(ticket);
+        return "Successfully marked ticket as read";
     }
 
     @Override
@@ -194,13 +215,14 @@ public class SupportServiceImpl implements SupportService {
     }
 
     @Override
+    @Transactional
     public List<TicketInfoDto> listCurrentUserTickets(int pageNumber, int pageSize, Boolean filterTicketStatus) {
         User currentUser = userService.getCurrentUser();
-        return listTicketsHelper(pageNumber, pageSize, currentUser, filterTicketStatus, false);
+        return listTicketsHelper(pageNumber, pageSize, currentUser, filterTicketStatus, false, currentUser);
     }
 
-    private List<TicketInfoDto> listTicketsHelper(int pageNumber, int pageSize, User user, Boolean filterTicketStatus, boolean anonymous) {
-        Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
+    private List<TicketInfoDto> listTicketsHelper(int pageNumber, int pageSize, User user, Boolean filterTicketStatus, boolean anonymous, User currentUser) {
+        Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by(Sort.Order.desc("updateDate")));
         List<Ticket> tickets;
         if (user == null) {
             if (filterTicketStatus == null) {
@@ -219,20 +241,26 @@ public class SupportServiceImpl implements SupportService {
                 tickets = supportRepository.findByIssuerAndClosed(user, filterTicketStatus, sortedByCreateDateDesc);
             }
         }
-        return ticketListToTicketInfoDtoList(tickets);
+        return ticketListToTicketInfoDtoList(tickets, currentUser);
     }
 
-    private List<TicketInfoDto> ticketListToTicketInfoDtoList(List<Ticket> tickets) {
+    private List<TicketInfoDto> ticketListToTicketInfoDtoList(List<Ticket> tickets, User user) {
         return tickets.stream()
                 .map(ticket -> {
                     User issuer = ticket.getIssuer();
+                    Hibernate.initialize(ticket.getComments());
                     return new TicketInfoDto(
                             ticket.getId(),
                             ticket.getTitle(),
                             ticket.getContent(),
                             (issuer != null ? ticket.getIssuer().getUsername() : "Anonymous"),
                             ticket.getCreateDate(),
-                            ticket.isClosed()
+                            ticket.isClosed(),
+                            ticket.isViewed(),
+                            ticket.getComments().stream()
+                                    .filter(ticketComment -> !ticketComment.getIssuer().equals(user))
+                                    .filter(ticketComment -> !ticketComment.isViewed())
+                                    .count()
                     );
                 })
                 .collect(Collectors.toList());
@@ -267,7 +295,8 @@ public class SupportServiceImpl implements SupportService {
                 ticket.getCreateDate(),
                 ticket.isClosed(),
                 ticket.getAttachmentPaths(),
-                ticketCommentListToTicketCommentDtoList(ticket.getComments())
+                ticketCommentListToTicketCommentDtoList(ticket.getComments()),
+                ticket.isViewed()
         );
     }
 
@@ -282,7 +311,8 @@ public class SupportServiceImpl implements SupportService {
                             ticketComment.getContent(),
                             (issuer != null ? ticketComment.getIssuer().getUsername() : "Anonymous"),
                             ticketComment.getCreateDate(),
-                            ticketComment.getAttachmentPaths()
+                            ticketComment.getAttachmentPaths(),
+                            ticketComment.isViewed()
                     );
                 })
                 .sorted(Comparator.comparing(TicketCommentDto::getCreateDate))
@@ -344,6 +374,7 @@ public class SupportServiceImpl implements SupportService {
         }
         ticketComment.setAttachmentPaths(savedFiles.stream().map(Attachment::getName).collect(Collectors.toList()));
         ticket.getComments().add(ticketComment);
+        ticket.setUpdateDate(new Date());
         supportRepository.save(ticket);
         return "Successfully posted comment";
     }
@@ -368,6 +399,47 @@ public class SupportServiceImpl implements SupportService {
         } catch (IOException e) {
             throw new MyException("Could not download ticket attachment", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    @Override
+    @Transactional
+    public Long getClientNumberOfCommentNotifications() {
+        User currentUser = userService.getCurrentUser();
+        List<Ticket> currentUserTickets = supportRepository.findByIssuer(currentUser);
+        return currentUserTickets.stream()
+                .mapToLong(ticket -> {
+                    Hibernate.initialize(ticket.getComments());
+                    return ticket.getComments().stream()
+                            .filter(ticketComment -> !ticketComment.getIssuer().equals(currentUser))
+                            .filter(ticketComment -> !ticketComment.isViewed())
+                            .count();
+                })
+                .sum();
+    }
+
+    @Override
+    @Transactional
+    public String markCommentsAsRead(Integer ticketId) {
+        Ticket ticket = supportRepository.findById(ticketId).orElseThrow(() -> new MyException("Ticket does not exist", HttpStatus.BAD_REQUEST));
+        User currentUser = userService.getCurrentUser();
+        Hibernate.initialize(ticket.getComments());
+        List<TicketComment> comments = ticket.getComments();
+        long tmp = comments.stream()
+                .filter(ticketComment -> !ticketComment.getIssuer().equals(currentUser) && !ticketComment.isViewed())
+                .count();
+        if (tmp == 0) {
+            throw new MyException("All ticket comments already viewed", HttpStatus.BAD_REQUEST);
+        }
+        comments.stream()
+                .filter(ticketComment -> !ticketComment.getIssuer().equals(currentUser))
+                .forEach(ticketComment -> {
+                    if (!ticketComment.isViewed()) {
+                        ticketComment.setViewed(true);
+                    }
+                });
+        ticket.setComments(comments);
+        supportRepository.save(ticket);
+        return "Successfully marked ticket comments as read";
     }
 
     @Override

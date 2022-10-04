@@ -23,4 +23,8 @@ public class TicketInfoDto {
 
     private boolean closed;
 
+    private boolean viewed;
+
+    private Long unreadComments;
+
 }
