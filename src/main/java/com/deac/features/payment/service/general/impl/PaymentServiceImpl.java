@@ -21,12 +21,19 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.FileCopyUtils;
 
 import javax.mail.MessagingException;
 import java.awt.*;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -51,6 +58,8 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final String receiptsBaseDirectory;
 
+    private String paymentTemplate;
+
     @Autowired
     public PaymentServiceImpl(UserService userService, EmailService emailService, Environment environment) {
         this.userService = userService;
@@ -58,6 +67,18 @@ public class PaymentServiceImpl implements PaymentService {
         amount = Objects.requireNonNull(environment.getProperty("membership.amount", Long.class));
         currency = Objects.requireNonNull(environment.getProperty("membership.currency", String.class));
         receiptsBaseDirectory = Objects.requireNonNull(environment.getProperty("file.receipts.rootdir", String.class));
+        ResourceLoader resourceLoader = new DefaultResourceLoader();
+        Resource emailTemplateResource = resourceLoader.getResource("classpath:templates/EmailTemplate.html");
+        Resource paymentTemplateResource = resourceLoader.getResource("classpath:templates/PaymentTemplate.html");
+        try (
+                Reader emailTemplateReader = new InputStreamReader(emailTemplateResource.getInputStream(), StandardCharsets.UTF_8);
+                Reader paymentTemplateReader = new InputStreamReader(paymentTemplateResource.getInputStream(), StandardCharsets.UTF_8)
+        ) {
+            String emailTemplate = FileCopyUtils.copyToString(emailTemplateReader);
+            paymentTemplate = emailTemplate.replace("[BODY_TEMPLATE]", FileCopyUtils.copyToString(paymentTemplateReader));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -444,18 +465,18 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public void sendPaymentSuccessEmail(User user, List<String> items, List<Attachment> attachments) {
         StringBuilder paidMonthsString = new StringBuilder();
-        for (int i = 0; i < items.size(); i++) {
-            paidMonthsString.append(items.get(i));
-            if (i != items.size() - 1) {
-                paidMonthsString.append(", ");
-            } else {
-                paidMonthsString.append(".<br>");
-            }
+        paidMonthsString.append("<ul>");
+        for (String item : items) {
+            paidMonthsString.append("<li>").append(item).append("</li>");
         }
+        paidMonthsString.append("</ul>");
         try {
+            String emailBody = paymentTemplate.replace("[SURNAME]", user.getSurname())
+                    .replace("[LASTNAME]", user.getLastname())
+                    .replace("[RECEIPT_MONTHS]", paidMonthsString);
             emailService.sendMessage(user.getEmail(),
                     "Your payment receipt",
-                    "<h3>Dear " + user.getSurname() + " " + user.getLastname() + ", you have successfully paid the membership fees for the following months:<br>" + paidMonthsString + "We've sent your payment receipt as an attachment.<h3>",
+                    emailBody,
                     attachments);
         } catch (MessagingException ignored) {
         }

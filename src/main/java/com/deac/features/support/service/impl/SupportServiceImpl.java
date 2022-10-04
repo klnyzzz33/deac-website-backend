@@ -6,24 +6,35 @@ import com.deac.features.support.persistence.entity.Ticket;
 import com.deac.features.support.persistence.entity.TicketComment;
 import com.deac.features.support.persistence.repository.SupportRepository;
 import com.deac.features.support.service.SupportService;
+import com.deac.mail.Attachment;
 import com.deac.mail.EmailService;
 import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.hibernate.Hibernate;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.safety.Safelist;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.FileCopyUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.mail.MessagingException;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -40,12 +51,26 @@ public class SupportServiceImpl implements SupportService {
 
     private final String ticketAttachmentUploadBaseDirectory;
 
+    private String supportTemplate;
+
     @Autowired
     public SupportServiceImpl(SupportRepository supportRepository, UserService userService, EmailService emailService, Environment environment) {
         this.supportRepository = supportRepository;
         this.userService = userService;
         this.emailService = emailService;
         ticketAttachmentUploadBaseDirectory = Objects.requireNonNull(environment.getProperty("file.tickets.rootdir", String.class));
+        ResourceLoader resourceLoader = new DefaultResourceLoader();
+        Resource emailTemplateResource = resourceLoader.getResource("classpath:templates/EmailTemplate.html");
+        Resource supportTemplateResource = resourceLoader.getResource("classpath:templates/SupportTemplate.html");
+        try (
+                Reader emailTemplateReader = new InputStreamReader(emailTemplateResource.getInputStream(), StandardCharsets.UTF_8);
+                Reader supportTemplateReader = new InputStreamReader(supportTemplateResource.getInputStream(), StandardCharsets.UTF_8)
+        ) {
+            String emailTemplate = FileCopyUtils.copyToString(emailTemplateReader);
+            supportTemplate = emailTemplate.replace("[BODY_TEMPLATE]", FileCopyUtils.copyToString(supportTemplateReader));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -138,13 +163,13 @@ public class SupportServiceImpl implements SupportService {
                 currentUser,
                 currentUser.getEmail()
         );
-        List<String> savedFileNames = uploadAttachments(files, currentUser.getId(), ticket.getTitle(), null);
-        ticket.setAttachmentPaths(savedFileNames);
+        List<Attachment> savedFiles = uploadAttachments(files, currentUser.getId(), ticket.getTitle(), null);
+        ticket.setAttachmentPaths(savedFiles.stream().map(Attachment::getName).collect(Collectors.toList()));
         supportRepository.save(ticket);
         return ticket.getId();
     }
 
-    private List<String> uploadAttachments(MultipartFile[] files, Integer userId, String ticketId, String commentId) {
+    private List<Attachment> uploadAttachments(MultipartFile[] files, Integer userId, String ticketId, String commentId) {
         try {
             String baseDir;
             if (userId != null) {
@@ -152,7 +177,7 @@ public class SupportServiceImpl implements SupportService {
             } else {
                 baseDir = ticketAttachmentUploadBaseDirectory + "anonymous/" + ticketId + "/" + (commentId != null ? (commentId + "/") : "");
             }
-            List<String> savedFileNames = new ArrayList<>();
+            List<Attachment> savedFiles = new ArrayList<>();
             for (MultipartFile file : files) {
                 if (!Objects.requireNonNull(file.getContentType()).startsWith("image/") && !file.getContentType().startsWith("application/pdf")) {
                     throw new MyException("Unsupported file type", HttpStatus.BAD_REQUEST);
@@ -160,9 +185,9 @@ public class SupportServiceImpl implements SupportService {
                 byte[] fileBytes = file.getBytes();
                 Files.createDirectories(Path.of(baseDir));
                 Path targetPath = Path.of(baseDir + file.getOriginalFilename());
-                savedFileNames.add(Files.write(targetPath, fileBytes).getFileName().toString());
+                savedFiles.add(new Attachment(Files.write(targetPath, fileBytes).getFileName().toString(), fileBytes));
             }
-            return savedFileNames;
+            return savedFiles;
         } catch (IOException e) {
             throw new MyException("File upload failed", HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -298,21 +323,26 @@ public class SupportServiceImpl implements SupportService {
                 content,
                 currentUser
         );
-        List<String> savedFileNames;
+        List<Attachment> savedFiles;
         if (ticket.getIssuer() == null) {
-            savedFileNames = uploadAttachments(files, null, ticket.getTitle(), ticketComment.getTitle());
+            savedFiles = uploadAttachments(files, null, ticket.getTitle(), ticketComment.getTitle());
             ticket.setClosed(true);
             try {
+                Document.OutputSettings outputSettings = new Document.OutputSettings();
+                outputSettings.prettyPrint(false);
+                String emailBody = supportTemplate.replace("[ORIGINAL_CONTENT]", Jsoup.clean(ticket.getContent(), "", Safelist.none(), outputSettings))
+                        .replace("[SUPPORT_STAFF_NAME]", currentUser.getUsername())
+                        .replace("[COMMENT_CONTENT]", Jsoup.clean(ticketComment.getContent(), "", Safelist.none(), outputSettings));
                 emailService.sendMessage(ticket.getIssuerEmail(),
                         "#" + ticket.getTitle(),
-                        "<h3>Dear Sir/Madam,<br>our support has reviewed and answered your issue:</h3><hr><b>You</b> originally asked:<br>``` " + ticket.getContent() + " ```<br><br><b>" + currentUser.getUsername() + "</b> said:<br>``` " + ticketComment.getContent() + " ```<br>If you have any more questions/problems, reply to this email.<br>Regards,<br><b>DEAC Kyokushin Karate Support Staff</b>",
-                        List.of());
+                        emailBody,
+                        savedFiles);
             } catch (MessagingException ignored) {
             }
         } else {
-            savedFileNames = uploadAttachments(files, ticket.getIssuer().getId(), ticket.getTitle(), ticketComment.getTitle());
+            savedFiles = uploadAttachments(files, ticket.getIssuer().getId(), ticket.getTitle(), ticketComment.getTitle());
         }
-        ticketComment.setAttachmentPaths(savedFileNames);
+        ticketComment.setAttachmentPaths(savedFiles.stream().map(Attachment::getName).collect(Collectors.toList()));
         ticket.getComments().add(ticketComment);
         supportRepository.save(ticket);
         return "Successfully posted comment";

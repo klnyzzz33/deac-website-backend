@@ -15,6 +15,9 @@ import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -22,10 +25,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.FileCopyUtils;
 
 import javax.annotation.PostConstruct;
 import javax.mail.MessagingException;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.YearMonth;
@@ -44,12 +51,26 @@ public class MembershipServiceImpl implements MembershipService {
 
     private final String receiptsBaseDirectory;
 
+    private String membershipReminderTemplate;
+
     @Autowired
     public MembershipServiceImpl(MembershipRepository membershipRepository, UserService userService, EmailService emailService, Environment environment) {
         this.membershipRepository = membershipRepository;
         this.userService = userService;
         this.emailService = emailService;
         receiptsBaseDirectory = Objects.requireNonNull(environment.getProperty("file.receipts.rootdir", String.class));
+        ResourceLoader resourceLoader = new DefaultResourceLoader();
+        Resource emailTemplateResource = resourceLoader.getResource("classpath:templates/EmailTemplate.html");
+        Resource membershipReminderTemplateResource = resourceLoader.getResource("classpath:templates/MembershipReminderTemplate.html");
+        try (
+                Reader emailTemplateReader = new InputStreamReader(emailTemplateResource.getInputStream(), StandardCharsets.UTF_8);
+                Reader membershipReminderTemplateReader = new InputStreamReader(membershipReminderTemplateResource.getInputStream(), StandardCharsets.UTF_8)
+        ) {
+            String emailTemplate = FileCopyUtils.copyToString(emailTemplateReader);
+            membershipReminderTemplate = emailTemplate.replace("[BODY_TEMPLATE]", FileCopyUtils.copyToString(membershipReminderTemplateReader));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -290,18 +311,19 @@ public class MembershipServiceImpl implements MembershipService {
                             .sorted(comparator.reversed())
                             .collect(Collectors.toList());
                     StringBuilder unpaidMonthsString = new StringBuilder();
-                    for (int i = 0; i < unpaidMonths.size(); i++) {
-                        unpaidMonthsString.append(unpaidMonths.get(i));
-                        if (i != unpaidMonths.size() - 1) {
-                            unpaidMonthsString.append(", ");
-                        } else {
-                            unpaidMonthsString.append(".<br>");
-                        }
+                    unpaidMonthsString.append("<ul>");
+                    for (String unpaidMonth : unpaidMonths) {
+                        unpaidMonthsString.append("<li>").append(unpaidMonth).append("</li>");
                     }
+                    unpaidMonthsString.append("</ul>");
                     try {
+                        String emailBody = membershipReminderTemplate.replace("[SURNAME]", membershipEntry.getUser().getSurname())
+                                .replace("[LASTNAME]", membershipEntry.getUser().getLastname())
+                                .replace("[MONTH_COUNT]", String.valueOf(unpaidMonths.size()))
+                                .replace("[UNPAID_MONTHS]", unpaidMonthsString);
                         emailService.sendMessage(membershipEntry.getUser().getEmail(),
                                 "Monthly reminder to pay your membership fee",
-                                "<h3>Dear " + membershipEntry.getUser().getSurname() + " " + membershipEntry.getUser().getLastname() + ", this is your monthly automated email to remind you to pay your membership fee. You currently have " + unpaidMonths.size() + " unpaid month(s):<br>" + unpaidMonthsString + "Remember that if you do not pay the given fees for more than 3 months, you will be banned from the site.<br>In case you get banned but you would like to rejoin the site, contact our support.<h3>",
+                                emailBody,
                                 List.of());
                     } catch (MessagingException ignored) {
                     }
