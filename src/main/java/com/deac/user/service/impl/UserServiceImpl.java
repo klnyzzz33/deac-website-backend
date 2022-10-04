@@ -20,6 +20,9 @@ import com.stripe.param.CustomerCreateParams;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -36,9 +39,12 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.FileCopyUtils;
 
 import javax.mail.MessagingException;
 import javax.servlet.http.HttpServletResponse;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -60,6 +66,14 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     private final RefreshTokenProvider refreshTokenProvider;
 
     private final EmailService emailService;
+
+    private String verifyEmailTemplate;
+
+    private String forgotPasswordTemplate;
+
+    private String resetPasswordTemplate;
+
+    private String forgotUsernameTemplate;
 
     @Autowired
     public UserServiceImpl(AuthenticationManager authenticationManager,
@@ -84,6 +98,27 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             admin.setEnabled(true);
             admin.setMembershipEntry(new MembershipEntry(true, Map.of(), true));
             this.userRepository.save(admin);
+        }
+        ResourceLoader resourceLoader = new DefaultResourceLoader();
+        Resource emailTemplateResource = resourceLoader.getResource("classpath:templates/EmailTemplate.html");
+        Resource verifyEmailTemplateResource = resourceLoader.getResource("classpath:templates/VerifyEmailTemplate.html");
+        Resource forgotPasswordTemplateResource = resourceLoader.getResource("classpath:templates/ForgotPasswordTemplate.html");
+        Resource resetPasswordTemplateResource = resourceLoader.getResource("classpath:templates/ResetPasswordTemplate.html");
+        Resource forgotUsernameTemplateResource = resourceLoader.getResource("classpath:templates/ForgotUsernameTemplate.html");
+        try (
+                Reader emailTemplateReader = new InputStreamReader(emailTemplateResource.getInputStream(), StandardCharsets.UTF_8);
+                Reader verifyEmailTemplateReader = new InputStreamReader(verifyEmailTemplateResource.getInputStream(), StandardCharsets.UTF_8);
+                Reader forgotPasswordTemplateReader = new InputStreamReader(forgotPasswordTemplateResource.getInputStream(), StandardCharsets.UTF_8);
+                Reader resetPasswordTemplateReader = new InputStreamReader(resetPasswordTemplateResource.getInputStream(), StandardCharsets.UTF_8);
+                Reader forgotUsernameTemplateReader = new InputStreamReader(forgotUsernameTemplateResource.getInputStream(), StandardCharsets.UTF_8)
+        ) {
+            String emailTemplate = FileCopyUtils.copyToString(emailTemplateReader);
+            verifyEmailTemplate = emailTemplate.replace("[BODY_TEMPLATE]", FileCopyUtils.copyToString(verifyEmailTemplateReader));
+            forgotPasswordTemplate = emailTemplate.replace("[BODY_TEMPLATE]", FileCopyUtils.copyToString(forgotPasswordTemplateReader));
+            resetPasswordTemplate = emailTemplate.replace("[BODY_TEMPLATE]", FileCopyUtils.copyToString(resetPasswordTemplateReader));
+            forgotUsernameTemplate = emailTemplate.replace("[BODY_TEMPLATE]", FileCopyUtils.copyToString(forgotUsernameTemplateReader));
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -143,9 +178,10 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             String verifyTokenHash = DigestUtils.sha256Hex(verifyToken);
             Long expiresAt = System.currentTimeMillis() + 604800000;
             tokenRepository.save(new Token(new TokenKey(user.getId(), verifyTokenHash), expiresAt, "verify-email"));
+            String emailBody = verifyEmailTemplate.replace("[USERNAME]", user.getUsername()).replace("[TOKEN]", verifyToken);
             emailService.sendMessage(user.getEmail(),
                     "Verify your email",
-                    "<h3>Congratulations " + user.getUsername() + ", you have successfully registered to our website! In order to use our site, please verify your email here:</h3><br>http://localhost:4200/verify?token=" + verifyToken + "<br><h3>The link expires in 1 week, if you do not verify your email in the given time, we'll cancel your registration.<h3>",
+                    emailBody,
                     List.of());
             return "Successfully registered with user " + user.getUsername();
         } catch (MessagingException e) {
@@ -278,9 +314,10 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             String passwordToken = RandomStringUtils.randomAlphanumeric(64, 96);
             String passwordTokenHash = DigestUtils.sha256Hex(passwordToken);
             Long expiresAt = System.currentTimeMillis() + 300000;
+            String emailBody = forgotPasswordTemplate.replace("[TOKEN]", passwordToken);
             emailService.sendMessage(email,
                     "Reset your password",
-                    "<h3>You've issued a request to reset your password. In order to do that, please follow this link: </h3><br>http://localhost:4200/reset-password?token=" + passwordToken,
+                    emailBody,
                     List.of());
             tokenRepository.save(new Token(new TokenKey(user.getId(), passwordTokenHash), expiresAt, "password-reset"));
             return "Recovery link sent if user exists";
@@ -317,9 +354,10 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             userRepository.save(user);
             refreshTokenProvider.invalidateUserTokens(user.getUsername());
             tokenRepository.deleteAllByUserIdAndPurpose(userId, "password-reset");
+            String emailBody = resetPasswordTemplate;
             emailService.sendMessage(user.getEmail(),
                     "Your password has been changed",
-                    "<h3>We've noticed that your password to your account has been changed. If this wasn't you, please contact our support immediately.",
+                    emailBody,
                     List.of());
             return "Password successfully reset";
         } catch (MessagingException e) {
@@ -335,9 +373,10 @@ public class UserServiceImpl implements UserService, UserDetailsService {
                 return "Recovery email sent if user exists";
             }
             User user = userOptional.get();
+            String emailBody = forgotUsernameTemplate.replace("[USERNAME]", user.getUsername());
             emailService.sendMessage(email,
                     "Username reminder",
-                    "<h3>You've issued a request to get a reminder of your username.</h3><br><h3>Your username associated with this email is " + user.getUsername() + ".</h3>",
+                    emailBody,
                     List.of());
             return "Recovery email sent if user exists";
         } catch (MessagingException e) {
