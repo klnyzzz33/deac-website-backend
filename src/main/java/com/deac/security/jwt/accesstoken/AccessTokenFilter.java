@@ -30,7 +30,9 @@ public class AccessTokenFilter extends OncePerRequestFilter {
             "/api/user/verify",
             "/api/user/auth/refresh",
             "/api/news/**",
-            "/api/support/ticket/create_anonymous"
+            "/api/support/ticket/create_anonymous",
+            "/api/mailinglist/subscribe",
+            "/api/mailinglist/unsubscribe"
     };
 
     private final AccessTokenProvider accessTokenProvider;

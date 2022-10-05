@@ -25,6 +25,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.FileCopyUtils;
@@ -37,6 +38,8 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -452,6 +455,12 @@ public class SupportServiceImpl implements SupportService {
         );
         supportRepository.save(ticket);
         return "Successfully created anonymous ticket";
+    }
+
+    @Scheduled(cron = "0 0 0 1 * *")
+    public void deleteOldClosedTickets() {
+        long timeInMillis = LocalDateTime.from(new Date().toInstant()).minusYears(1).toEpochSecond(OffsetDateTime.now().getOffset());
+        supportRepository.deleteAllByUpdateDateBeforeAndClosed(timeInMillis, true);
     }
 
 }

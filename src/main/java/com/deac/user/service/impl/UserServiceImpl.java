@@ -439,10 +439,10 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         long time = System.currentTimeMillis();
         String purpose = "verify-email";
         List<Token> tokensToDelete = tokenRepository.findAllByExpiresAtBeforeAndPurpose(time, purpose);
-        tokensToDelete.forEach(token -> {
+        for (Token token : tokensToDelete) {
             Integer userId = token.getTokenId().getUserId();
             userRepository.deleteById(userId);
-        });
+        }
         tokenRepository.deleteAllByExpiresAtBeforeAndPurpose(time, purpose);
     }
 
