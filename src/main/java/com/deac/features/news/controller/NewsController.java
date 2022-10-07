@@ -3,6 +3,7 @@ package com.deac.features.news.controller;
 import com.deac.features.news.dto.ModifyDto;
 import com.deac.features.news.dto.NewsDto;
 import com.deac.features.news.dto.NewsInfoDto;
+import com.deac.features.news.dto.NewsSearchBarItem;
 import com.deac.features.news.service.NewsService;
 import com.deac.response.ResponseMessage;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,6 +89,19 @@ public class NewsController {
     @GetMapping("/api/news/open")
     public NewsInfoDto getSingleNews(@RequestParam(name = "id") Integer id) {
         return newsService.getSingleNews(id);
+    }
+
+    @GetMapping("/api/news/search/top")
+    public List<NewsSearchBarItem> getTopSearchResults(@RequestParam(name = "title") String searchTerm,
+                                                       @RequestParam(name = "entriesPerPage") int entriesPerPage) {
+        return newsService.getTopSearchResults(searchTerm, entriesPerPage);
+    }
+
+    @GetMapping("/api/news/search")
+    public List<NewsInfoDto> searchNews(@RequestParam(name = "title") String searchTerm,
+                                        @RequestParam(name = "pageNumber") int pageNumber,
+                                        @RequestParam(name = "entriesPerPage") int entriesPerPage) {
+        return newsService.searchNews(searchTerm, pageNumber, entriesPerPage);
     }
 
 }

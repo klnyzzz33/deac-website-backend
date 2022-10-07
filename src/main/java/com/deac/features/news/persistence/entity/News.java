@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import static com.deac.misc.StringSearchHelper.normalizeSearchTerm;
+
 @Entity
 @Getter
 @Setter
