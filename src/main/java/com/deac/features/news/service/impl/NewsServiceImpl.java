@@ -232,10 +232,15 @@ public class NewsServiceImpl implements NewsService {
         Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("numberOfViews").descending().and(Sort.by("createDate").descending()));
         Integer userId = userService.getUserByUsername(author).getId();
         List<News> newsList = newsRepository.findByAuthorIdAndIdNot(userId, excludedId, sortedByCreateDateDesc);
-        if (newsList.isEmpty()) {
-            return getLatestNewsWithExcluded(pageSize, excludedId);
+        if (newsList.size() < pageSize) {
+            newsList.addAll(getMostPopularNewsByAuthorNotWithExcluded(userId, pageSize - newsList.size(), excludedId));
         }
         return newsListToNewsInfoDtoList(newsList);
+    }
+
+    private List<News> getMostPopularNewsByAuthorNotWithExcluded(Integer authorId, int pageSize, int excludedId) {
+        Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("numberOfViews").descending().and(Sort.by("createDate").descending()));
+        return newsRepository.findByAuthorIdNotAndIdNot(authorId, excludedId, sortedByCreateDateDesc);
     }
 
     @Override
@@ -340,17 +345,18 @@ public class NewsServiceImpl implements NewsService {
         try {
             BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
             for (String keyword : keywords) {
-                Term term = new Term("normalizedTitle", keyword);
                 Query query;
                 if (!StringUtils.isNumeric(keyword)) {
-                    query = new FuzzyQuery(term, 2, 1);
-                    queryBuilder.add(query, BooleanClause.Occur.SHOULD);
-                    //query = new WildcardQuery(term);
-                    //queryBuilder.add(query, BooleanClause.Occur.SHOULD);
+                    BooleanQuery.Builder builder = new BooleanQuery.Builder()
+                            .add(new FuzzyQuery(new Term("normalizedTitle", keyword), 2, 1), BooleanClause.Occur.SHOULD);
+                    if (keyword.length() >= 3) {
+                        builder.add(new WildcardQuery(new Term("normalizedTitle", keyword + "*")), BooleanClause.Occur.SHOULD);
+                    }
+                    query = builder.build();
                 } else {
-                    query = new TermQuery(term);
-                    queryBuilder.add(query, BooleanClause.Occur.MUST);
+                    query = new TermQuery(new Term("normalizedTitle", keyword));
                 }
+                queryBuilder.add(query, BooleanClause.Occur.MUST);
             }
             Query query = queryBuilder.build();
             IndexReader indexReader = DirectoryReader.open(index);
