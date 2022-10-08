@@ -7,7 +7,7 @@ import lombok.*;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-public class NewsSearchBarItem {
+public class NewsSearchBarItemDto {
 
     private Integer id;
 

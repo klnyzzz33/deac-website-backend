@@ -1,14 +1,13 @@
 package com.deac.features.news.service.impl;
 
-import com.deac.features.news.dto.ModifyDto;
-import com.deac.features.news.dto.ModifyInfoDto;
-import com.deac.features.news.dto.NewsInfoDto;
-import com.deac.features.news.dto.NewsSearchBarItem;
+import com.deac.features.news.dto.*;
 import com.deac.features.news.persistence.entity.ModifyEntry;
 import com.deac.features.news.persistence.entity.News;
 import com.deac.features.news.persistence.repository.NewsRepository;
+import com.deac.features.news.service.LuceneSearchResult;
 import com.deac.features.news.service.NewsService;
 import com.deac.exception.MyException;
+import com.deac.features.news.service.SearchResult;
 import com.deac.user.service.UserService;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -284,41 +283,47 @@ public class NewsServiceImpl implements NewsService {
     }
 
     @Override
-    public List<NewsSearchBarItem> getTopSearchResults(String searchTerm, int pageSize) {
-        List<Integer> searchIds = doSearch(searchTerm);
-        Pageable pageable = PageRequest.of(0, pageSize);
-        return newsRepository.findAllByIdIn(searchIds, pageable).stream()
-                .map(news -> new NewsSearchBarItem(news.getId(),
+    public List<NewsSearchBarItemDto> getTopSearchResults(String searchTerm, int pageSize) {
+        SearchResult searchResult = doSearch(searchTerm, 0, pageSize);
+        List<Integer> searchIds = searchResult.getResults();
+        return newsRepository.findAllById(searchIds).stream()
+                .map(news -> new NewsSearchBarItemDto(news.getId(),
                         news.getTitle(),
                         news.getIndexImageUrl()))
+                .sorted(Comparator.comparing(item -> searchIds.indexOf(item.getId())))
                 .collect(Collectors.toList());
     }
 
     @Override
-    public List<NewsInfoDto> searchNews(String searchTerm, int pageNumber, int pageSize) {
-        List<Integer> searchIds = doSearch(searchTerm);
-        Pageable pageable = PageRequest.of(pageNumber, pageSize);
-        List<News> results = newsRepository.findAllByIdIn(searchIds, pageable);
-        return newsListToNewsInfoDtoList(results);
+    public NewsSearchListDto searchNews(String searchTerm, int pageNumber, int pageSize) {
+        SearchResult searchResult = doSearch(searchTerm, pageNumber - 1, pageSize);
+        List<Integer> searchIds = searchResult.getResults();
+        List<News> results = newsRepository.findAllById(searchIds);
+        results.sort(Comparator.comparing(item -> searchIds.indexOf(item.getId())));
+        return new NewsSearchListDto(newsListToNewsInfoDtoList(results), searchResult.getNumberOfResults());
     }
 
-    private List<Integer> doSearch(String searchTerm) {
+    private SearchResult doSearch(String searchTerm, int pageNumber, int pageSize) {
         if (searchTerm == null) {
-            return List.of();
+            return new SearchResult(List.of(), 0);
         }
         if (searchTerm.length() < 3) {
-            return List.of();
+            return new SearchResult(List.of(), 0);
         }
         String[] searchKeywords = normalizeSearchTerm(searchTerm);
         if (searchKeywords.length == 0) {
-            return List.of();
+            return new SearchResult(List.of(), 0);
         }
-        return searchIndex(searchKeywords).stream()
-                .map(indexableFields -> Integer.valueOf(indexableFields.get("id")))
-                .collect(Collectors.toList());
+        LuceneSearchResult searchResult = searchIndex(searchKeywords, pageNumber, pageSize);
+        return new SearchResult(
+                searchResult.getResults().stream()
+                        .map(indexableFields -> Integer.valueOf(indexableFields.get("id")))
+                        .collect(Collectors.toList()),
+                searchResult.getNumberOfResults()
+        );
     }
 
-    private List<Document> searchIndex(String[] keywords) {
+    private LuceneSearchResult searchIndex(String[] keywords, int pageNumber, int pageSize) {
         try {
             BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
             for (String keyword : keywords) {
@@ -334,12 +339,14 @@ public class NewsServiceImpl implements NewsService {
             Query query = queryBuilder.build();
             IndexReader indexReader = DirectoryReader.open(index);
             IndexSearcher searcher = new IndexSearcher(indexReader);
-            TopDocs topDocs = searcher.search(query, 10);
+            TopScoreDocCollector collector = TopScoreDocCollector.create(searcher.count(query));
+            searcher.search(query, collector);
             List<Document> documents = new ArrayList<>();
+            TopDocs topDocs = collector.topDocs(pageNumber * pageSize, pageSize);
             for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
                 documents.add(searcher.doc(scoreDoc.doc));
             }
-            return documents;
+            return new LuceneSearchResult(documents, topDocs.totalHits);
         } catch (IOException e) {
             throw new MyException("Unknown error occurred while searching", HttpStatus.INTERNAL_SERVER_ERROR);
         }

@@ -2,7 +2,8 @@ package com.deac.features.news.service;
 
 import com.deac.features.news.dto.ModifyDto;
 import com.deac.features.news.dto.NewsInfoDto;
-import com.deac.features.news.dto.NewsSearchBarItem;
+import com.deac.features.news.dto.NewsSearchBarItemDto;
+import com.deac.features.news.dto.NewsSearchListDto;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -33,7 +34,7 @@ public interface NewsService {
 
     NewsInfoDto getSingleNews(Integer id);
 
-    List<NewsSearchBarItem> getTopSearchResults(String searchTerm, int pageSize);
+    List<NewsSearchBarItemDto> getTopSearchResults(String searchTerm, int pageSize);
 
-    List<NewsInfoDto> searchNews(String searchTerm, int pageNumber, int pageSize);
+    NewsSearchListDto searchNews(String searchTerm, int pageNumber, int pageSize);
 }
