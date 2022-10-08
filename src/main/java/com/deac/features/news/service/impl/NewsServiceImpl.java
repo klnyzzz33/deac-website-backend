@@ -339,7 +339,7 @@ public class NewsServiceImpl implements NewsService {
             Query query = queryBuilder.build();
             IndexReader indexReader = DirectoryReader.open(index);
             IndexSearcher searcher = new IndexSearcher(indexReader);
-            TopScoreDocCollector collector = TopScoreDocCollector.create(searcher.count(query));
+            TopScoreDocCollector collector = TopScoreDocCollector.create(Math.max(1, searcher.count(query)));
             searcher.search(query, collector);
             List<Document> documents = new ArrayList<>();
             TopDocs topDocs = collector.topDocs(pageNumber * pageSize, pageSize);
