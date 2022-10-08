@@ -96,8 +96,8 @@ public class NewsController {
     }
 
     @GetMapping("/api/news/search/top")
-    public List<NewsSearchBarItemDto> getTopSearchResults(@RequestParam(name = "title") String searchTerm,
-                                                          @RequestParam(name = "entriesPerPage") int entriesPerPage) {
+    public NewsSearchBarDto getTopSearchResults(@RequestParam(name = "title") String searchTerm,
+                                                @RequestParam(name = "entriesPerPage") int entriesPerPage) {
         return newsService.getTopSearchResults(searchTerm, entriesPerPage);
     }
 

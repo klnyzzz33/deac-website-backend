@@ -232,6 +232,9 @@ public class NewsServiceImpl implements NewsService {
         Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("numberOfViews").descending().and(Sort.by("createDate").descending()));
         Integer userId = userService.getUserByUsername(author).getId();
         List<News> newsList = newsRepository.findByAuthorIdAndIdNot(userId, excludedId, sortedByCreateDateDesc);
+        if (newsList.isEmpty()) {
+            return getLatestNewsWithExcluded(pageSize, excludedId);
+        }
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -292,15 +295,16 @@ public class NewsServiceImpl implements NewsService {
     }
 
     @Override
-    public List<NewsSearchBarItemDto> getTopSearchResults(String searchTerm, int pageSize) {
+    public NewsSearchBarDto getTopSearchResults(String searchTerm, int pageSize) {
         SearchResult searchResult = doSearch(searchTerm, 0, pageSize);
         List<Integer> searchIds = searchResult.getResults();
-        return newsRepository.findAllById(searchIds).stream()
+        List<NewsSearchBarItemDto> results = newsRepository.findAllById(searchIds).stream()
                 .map(news -> new NewsSearchBarItemDto(news.getId(),
                         news.getTitle(),
                         news.getIndexImageUrl()))
                 .sorted(Comparator.comparing(item -> searchIds.indexOf(item.getId())))
                 .collect(Collectors.toList());
+        return new NewsSearchBarDto(results, searchResult.getNumberOfResults());
     }
 
     @Override
@@ -340,10 +344,13 @@ public class NewsServiceImpl implements NewsService {
                 Query query;
                 if (!StringUtils.isNumeric(keyword)) {
                     query = new FuzzyQuery(term, 2, 1);
+                    queryBuilder.add(query, BooleanClause.Occur.SHOULD);
+                    //query = new WildcardQuery(term);
+                    //queryBuilder.add(query, BooleanClause.Occur.SHOULD);
                 } else {
                     query = new TermQuery(term);
+                    queryBuilder.add(query, BooleanClause.Occur.MUST);
                 }
-                queryBuilder.add(query, BooleanClause.Occur.MUST);
             }
             Query query = queryBuilder.build();
             IndexReader indexReader = DirectoryReader.open(index);
