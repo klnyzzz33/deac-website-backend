@@ -26,6 +26,8 @@ public interface NewsService {
 
     List<NewsInfoDto> getLatestNewsWithExcluded(int pageSize, int excludedId);
 
+    List<NewsInfoDto> getMostPopularNewsByAuthorWithExcluded(String author, int pageSize, int excludedId);
+
     List<NewsInfoDto> listNewsByAuthor(String author, int pageNumber, int entriesPerPage);
 
     long getNumberOfNews();

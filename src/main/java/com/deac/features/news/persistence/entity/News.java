@@ -8,8 +8,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import static com.deac.misc.StringSearchHelper.normalizeSearchTerm;
-
 @Entity
 @Getter
 @Setter
@@ -43,6 +41,9 @@ public class News {
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @ToString.Exclude
     private List<ModifyEntry> modifyEntries;
+
+    @Column(nullable = false)
+    private Long numberOfViews = 0L;
 
     public News(String title, String description, String content, String indexImageUrl, Integer authorId, Date createDate) {
         this.title = title;
