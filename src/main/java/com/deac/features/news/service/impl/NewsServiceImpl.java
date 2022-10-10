@@ -34,6 +34,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -248,6 +250,18 @@ public class NewsServiceImpl implements NewsService {
         Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
         Integer userId = userService.getUserByUsername(author).getId();
         List<News> newsList = newsRepository.findByAuthorId(userId, sortedByCreateDateDesc);
+        return newsListToNewsInfoDtoList(newsList);
+    }
+
+    @Override
+    public List<NewsInfoDto> getLatestMostPopularNews(int pageSize) {
+        Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("numberOfViews").descending().and(Sort.by("createDate").descending()));
+        Date lastMonth = Date.from(LocalDateTime.now().minusMonths(1).atZone(ZoneId.systemDefault()).toInstant());
+        List<News> newsList = newsRepository.findByCreateDateAfter(lastMonth, sortedByCreateDateDesc);
+        if (newsList.size() < pageSize) {
+            sortedByCreateDateDesc = PageRequest.of(0, pageSize - newsList.size(), Sort.by("numberOfViews").descending().and(Sort.by("createDate").descending()));
+            newsList.addAll(newsRepository.findByCreateDateBefore(lastMonth, sortedByCreateDateDesc));
+        }
         return newsListToNewsInfoDtoList(newsList);
     }
 

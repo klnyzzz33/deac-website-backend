@@ -80,6 +80,11 @@ public class NewsController {
         return newsService.listNewsByAuthor(author, pageNumber, entriesPerPage);
     }
 
+    @GetMapping("/api/news/top/home")
+    public List<NewsInfoDto> listLatestMostPopularNews(@RequestParam(name = "entriesPerPage") int entriesPerPage) {
+        return newsService.getLatestMostPopularNews(entriesPerPage);
+    }
+
     @GetMapping("/api/news/count")
     public Long getNumberOfNews() {
         return newsService.getNumberOfNews();

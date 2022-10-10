@@ -27,6 +27,8 @@ public interface NewsService {
 
     List<NewsInfoDto> listNewsByAuthor(String author, int pageNumber, int entriesPerPage);
 
+    List<NewsInfoDto> getLatestMostPopularNews(int pageSize);
+
     long getNumberOfNews();
 
     long getNumberOfNewsByAuthor(String author);

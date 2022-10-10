@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Date;
 import java.util.List;
 
 @Repository
@@ -22,6 +23,10 @@ public interface NewsRepository extends JpaRepository<News, Integer> {
     List<News> findByAuthorIdAndIdNot(Integer authorId, int excludedId, Pageable pageable);
 
     List<News> findByAuthorIdNotAndIdNot(Integer authorId, int excludedId, Pageable pageable);
+
+    List<News> findByCreateDateAfter(Date createDate, Pageable pageable);
+
+    List<News> findByCreateDateBefore(Date createDate, Pageable pageable);
 
     long countByAuthorId(Integer authorId);
 
