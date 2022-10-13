@@ -2,7 +2,7 @@ package com.deac.features.membership.dto;
 
 import lombok.*;
 
-import java.time.YearMonth;
+import java.util.Date;
 
 @Getter
 @Setter
@@ -11,7 +11,7 @@ import java.time.YearMonth;
 @AllArgsConstructor
 public class MonthlyTransactionDto {
 
-    private YearMonth yearMonth;
+    private Date yearMonth;
 
     private String monthlyTransactionReceiptPath;
 

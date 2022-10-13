@@ -36,6 +36,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -221,7 +222,12 @@ public class MembershipServiceImpl implements MembershipService {
     private List<MonthlyTransactionDto> monthlyTransactionListToMonthlyTransactionDtoList(Collection<MonthlyTransaction> monthlyTransactions) {
         return monthlyTransactions
                 .stream()
-                .map(monthlyTransaction -> new MonthlyTransactionDto(monthlyTransaction.getMonthlyTransactionReceiptMonth(), monthlyTransaction.getMonthlyTransactionReceiptPath()))
+                .map(monthlyTransaction -> {
+                    Date date = Date.from(monthlyTransaction.getMonthlyTransactionReceiptMonth().atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+                    return new MonthlyTransactionDto(
+                            date,
+                            monthlyTransaction.getMonthlyTransactionReceiptPath());
+                })
                 .sorted(Comparator.comparing(MonthlyTransactionDto::getYearMonth).reversed())
                 .limit(12L)
                 .collect(Collectors.toList());
