@@ -21,7 +21,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
 
-import javax.annotation.PostConstruct;
 import javax.mail.MessagingException;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -118,7 +117,6 @@ public class MailingListServiceImpl implements MailingListService {
     }
 
     @Scheduled(cron = "0 0 0 * * 0")
-    @PostConstruct
     public void sendOutWeeklyMails() {
         List<NewsInfoDto> latestNews = newsService.getLatestNews(5);
         StringBuilder articleLines = new StringBuilder();
