@@ -1,5 +1,7 @@
 package com.deac.user.service.impl;
 
+import com.deac.features.mailinglist.persistence.entity.MailingListEntry;
+import com.deac.features.mailinglist.persistence.repository.MailingListRepository;
 import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.mail.EmailService;
 import com.deac.exception.MyException;
@@ -68,6 +70,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
 
     private final EmailService emailService;
 
+    private final MailingListRepository mailingListRepository;
+
     private String verifyEmailTemplate;
 
     private String forgotPasswordTemplate;
@@ -84,7 +88,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
                            TokenRepository tokenRepository,
                            AccessTokenProvider accessTokenProvider,
                            RefreshTokenProvider refreshTokenProvider,
-                           EmailService emailService) {
+                           EmailService emailService,
+                           MailingListRepository mailingListRepository) {
         this.authenticationManager = authenticationManager;
         this.passwordEncoder = passwordEncoder;
         this.objectMapper = objectMapper;
@@ -93,6 +98,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         this.accessTokenProvider = accessTokenProvider;
         this.refreshTokenProvider = refreshTokenProvider;
         this.emailService = emailService;
+        this.mailingListRepository = mailingListRepository;
         if (!this.userRepository.existsByRoles(List.of(Role.ADMIN))) {
             User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), "Admin", "", List.of(Role.ADMIN));
             admin.setVerified(true);
@@ -539,6 +545,12 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         User currentUser = getCurrentUser();
         currentUser.setLanguage(language);
         userRepository.save(currentUser);
+        Optional<MailingListEntry> mailingListEntryOptional = mailingListRepository.findByEmail(currentUser.getEmail());
+        if (mailingListEntryOptional.isPresent()) {
+            MailingListEntry mailingListEntry = mailingListEntryOptional.get();
+            mailingListEntry.setLanguage(language);
+            mailingListRepository.save(mailingListEntry);
+        }
         return "Language successfully set";
     }
 
