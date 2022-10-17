@@ -1,11 +1,15 @@
 package com.deac.features.mailinglist.controller;
 
+import com.deac.exception.MyException;
 import com.deac.features.mailinglist.dto.UnsubscribeDto;
 import com.deac.features.mailinglist.service.MailingListService;
 import com.deac.response.ResponseMessage;
+import com.deac.user.service.Language;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -34,8 +38,13 @@ public class MailingListController {
     }
 
     @PostMapping("/api/mailinglist/subscribe")
-    public ResponseMessage subscribeToMailingList(@RequestBody String email) {
-        return new ResponseMessage(mailingListService.subscribeToMailingList(email));
+    public ResponseMessage subscribeToMailingList(@RequestBody String email, @RequestParam("language") String language) {
+        try {
+            Language converted = Language.valueOf(language.toUpperCase());
+            return new ResponseMessage(mailingListService.subscribeToMailingList(email, converted));
+        } catch (IllegalArgumentException e) {
+            throw new MyException("Unsupported language", HttpStatus.BAD_REQUEST);
+        }
     }
 
     @PostMapping("/api/mailinglist/unsubscribe")

@@ -8,6 +8,7 @@ import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.persistence.repository.UserRepository;
 import com.deac.security.jwt.accesstoken.AccessTokenProvider;
+import com.deac.user.service.Language;
 import com.deac.user.service.UserService;
 import com.deac.user.token.entity.Token;
 import com.deac.user.token.entity.TokenKey;
@@ -172,17 +173,14 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             user.setRoles(List.of(Role.CLIENT));
             user.setEnabled(true);
             user.setMembershipEntry(new MembershipEntry());
+            user.setLanguage(user.getLanguage());
             createCustomer(user);
             userRepository.save(user);
             String verifyToken = RandomStringUtils.randomAlphanumeric(64, 96);
             String verifyTokenHash = DigestUtils.sha256Hex(verifyToken);
             Long expiresAt = System.currentTimeMillis() + 604800000;
             tokenRepository.save(new Token(new TokenKey(user.getId(), verifyTokenHash), expiresAt, "verify-email"));
-            String emailBody = verifyEmailTemplate.replace("[USERNAME]", user.getUsername()).replace("[TOKEN]", verifyToken);
-            emailService.sendMessage(user.getEmail(),
-                    "Verify your email",
-                    emailBody,
-                    List.of());
+            sendRegisterEmail(user, verifyToken);
             return "Successfully registered with user " + user.getUsername();
         } catch (MessagingException e) {
             userRepository.delete(user);
@@ -201,6 +199,43 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         } catch (StripeException e) {
             throw new MyException("Unknown error", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private void sendRegisterEmail(User user, String token) throws MessagingException {
+        String subject = "";
+        String line1 = "";
+        String line2 = "";
+        String line3 = "";
+        String line4 = "";
+        switch (user.getLanguage()) {
+            case HU:
+                subject = "Hitelesítse email címét";
+                line1 = "Gratulálunk [USERNAME], sikeresen regisztrált a weboldalunkra!";
+                line2 = "Ahhoz, hogy használni tudja az oldalunkat, először kérjük erősítse meg az email címét itt:";
+                line3 = "Email hitelesítése";
+                line4 = "A link 1 hétig érvényes. Amennyiben nem hitelesíti email címét a megadott időn belül, visszavonjuk regisztrációját.";
+                break;
+            case EN:
+                subject = "Verify your email";
+                line1 = "Congratulations [USERNAME], you have successfully registered to our website!";
+                line2 = "In order to use our site, please verify your email here:";
+                line3 = "Verify email";
+                line4 = "The link expires in 1 week, if you do not verify your email in the given time, we'll cancel your registration.";
+                break;
+            default:
+                throw new MyException("Unsupported language", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        line1 = line1.replace("[USERNAME]", user.getUsername());
+        String emailBody = verifyEmailTemplate
+                .replace("[LINE_1]", line1)
+                .replace("[LINE_2]", line2)
+                .replace("[LINE_3]", line3)
+                .replace("[LINE_4]", line4)
+                .replace("[TOKEN]", token);
+        emailService.sendMessage(user.getEmail(),
+                subject,
+                emailBody,
+                List.of());
     }
 
     @Override
@@ -314,16 +349,44 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             String passwordToken = RandomStringUtils.randomAlphanumeric(64, 96);
             String passwordTokenHash = DigestUtils.sha256Hex(passwordToken);
             Long expiresAt = System.currentTimeMillis() + 300000;
-            String emailBody = forgotPasswordTemplate.replace("[TOKEN]", passwordToken);
-            emailService.sendMessage(email,
-                    "Reset your password",
-                    emailBody,
-                    List.of());
+            sendForgotPasswordEmail(user, passwordToken);
             tokenRepository.save(new Token(new TokenKey(user.getId(), passwordTokenHash), expiresAt, "password-reset"));
             return "Recovery link sent if user exists";
         } catch (MessagingException e) {
             return "Recovery link sent if user exists";
         }
+    }
+
+    private void sendForgotPasswordEmail(User user, String token) throws MessagingException {
+        String subject = "";
+        String line1 = "";
+        String line2 = "";
+        String line3 = "";
+        switch (user.getLanguage()) {
+            case HU:
+                subject = "Jelszó visszaállítás";
+                line1 = "Ön jelszava visszaállítását kérte.";
+                line2 = "Ahhoz, hogy ezt megtegye, kérjük kövesse az alábbi linket:";
+                line3 = "Jelszó visszaállítás";
+                break;
+            case EN:
+                subject = "Reset your password";
+                line1 = "You've issued a request to reset your password.";
+                line2 = "In order to do that, please follow this link:";
+                line3 = "Reset password";
+                break;
+            default:
+                throw new MyException("Unsupported language", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        String emailBody = forgotPasswordTemplate
+                .replace("[LINE_1]", line1)
+                .replace("[LINE_2]", line2)
+                .replace("[LINE_3]", line3)
+                .replace("[TOKEN]", token);
+        emailService.sendMessage(user.getEmail(),
+                subject,
+                emailBody,
+                List.of());
     }
 
     @Override
@@ -354,15 +417,38 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             userRepository.save(user);
             refreshTokenProvider.invalidateUserTokens(user.getUsername());
             tokenRepository.deleteAllByUserIdAndPurpose(userId, "password-reset");
-            String emailBody = resetPasswordTemplate;
-            emailService.sendMessage(user.getEmail(),
-                    "Your password has been changed",
-                    emailBody,
-                    List.of());
+            sendPasswordChangedEmail(user);
             return "Password successfully reset";
         } catch (MessagingException e) {
             return "Password successfully reset";
         }
+    }
+
+    private void sendPasswordChangedEmail(User user) throws MessagingException {
+        String subject = "";
+        String line1 = "";
+        String line2 = "";
+        switch (user.getLanguage()) {
+            case HU:
+                subject = "Jelszava megváltozott";
+                line1 = "Észrevettük, hogy a fiókjához tartozó jelszó nemrég megváltozott.";
+                line2 = "Amennyiben ez nem Ön volt, kérjük vegye fel a kapcsolatot support csapatunkkal minél hamarabb.";
+                break;
+            case EN:
+                subject = "Your password has been changed";
+                line1 = "We've noticed that your password to your account has been changed.";
+                line2 = "If this wasn't you, please contact our support immediately.";
+                break;
+            default:
+                throw new MyException("Unsupported language", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        String emailBody = resetPasswordTemplate
+                .replace("[LINE_1]", line1)
+                .replace("[LINE_2]", line2);
+        emailService.sendMessage(user.getEmail(),
+                subject,
+                emailBody,
+                List.of());
     }
 
     @Override
@@ -373,15 +459,39 @@ public class UserServiceImpl implements UserService, UserDetailsService {
                 return "Recovery email sent if user exists";
             }
             User user = userOptional.get();
-            String emailBody = forgotUsernameTemplate.replace("[USERNAME]", user.getUsername());
-            emailService.sendMessage(email,
-                    "Username reminder",
-                    emailBody,
-                    List.of());
+            sendUsernameReminderEmail(user);
             return "Recovery email sent if user exists";
         } catch (MessagingException e) {
             return "Recovery email sent if user exists";
         }
+    }
+
+    private void sendUsernameReminderEmail(User user) throws MessagingException {
+        String subject = "";
+        String line1 = "";
+        String line2 = "";
+        switch (user.getLanguage()) {
+            case HU:
+                subject = "Felhasználónév emlékeztető";
+                line1 = "Ön a felhasználónevéről kért emlékeztetőt.";
+                line2 = "Ehhez az email címhez tartozó felhasználóneve a következő: [USERNAME].";
+                break;
+            case EN:
+                subject = "Username reminder";
+                line1 = "You've issued a request to get a reminder of your username.";
+                line2 = "Your username associated with this email is [USERNAME].";
+                break;
+            default:
+                throw new MyException("Unsupported language", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        line2 = line2.replace("[USERNAME]", user.getUsername());
+        String emailBody = forgotUsernameTemplate
+                .replace("[LINE_1]", line1)
+                .replace("[LINE_2]", line2);
+        emailService.sendMessage(user.getEmail(),
+                subject,
+                emailBody,
+                List.of());
     }
 
     @Override
@@ -422,6 +532,20 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     @Override
     public ResponseCookie setCookie(String name, String value, long age, boolean httpOnly, String path) {
         return refreshTokenProvider.setCookie(name, value, age, httpOnly, path);
+    }
+
+    @Override
+    public String setLanguage(Language language) {
+        User currentUser = getCurrentUser();
+        currentUser.setLanguage(language);
+        userRepository.save(currentUser);
+        return "Language successfully set";
+    }
+
+    @Override
+    public Language getCurrentUserLanguage() {
+        User currentUser = getCurrentUser();
+        return currentUser.getLanguage();
     }
 
     @Scheduled(fixedDelay = 86400000)

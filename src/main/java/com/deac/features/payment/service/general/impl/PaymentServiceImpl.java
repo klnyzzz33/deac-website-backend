@@ -471,15 +471,42 @@ public class PaymentServiceImpl implements PaymentService {
         }
         paidMonthsString.append("</ul>");
         try {
-            String emailBody = paymentTemplate.replace("[SURNAME]", user.getSurname())
-                    .replace("[LASTNAME]", user.getLastname())
-                    .replace("[RECEIPT_MONTHS]", paidMonthsString);
-            emailService.sendMessage(user.getEmail(),
-                    "Your payment receipt",
-                    emailBody,
-                    attachments);
+            sendPaymentEmail(user, paidMonthsString.toString(), attachments);
         } catch (MessagingException ignored) {
         }
+    }
+
+    private void sendPaymentEmail(User user, String paidMonthsString, List<Attachment> attachments) throws MessagingException {
+        String subject = "";
+        String line1 = "";
+        String line2 = "";
+        String line3 = "";
+        switch (user.getLanguage()) {
+            case HU:
+                subject = "Fizetési igazolás";
+                line1 = "Tisztelt [SURNAME] [LASTNAME],";
+                line2 = "sikeresen befizette a havi tagdíjat a következő hónap(ok)ra:";
+                line3 = "A számlát mellékletként csatoltuk.";
+                break;
+            case EN:
+                subject = "Your payment receipt";
+                line1 = "Dear [SURNAME] [LASTNAME],";
+                line2 = "you have successfully paid the membership fees for the following month(s):";
+                line3 = "We've sent your payment receipt as an attachment.";
+                break;
+            default:
+                throw new MyException("Unsupported language", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        line1 = line1.replace("[SURNAME]", user.getSurname()).replace("[LASTNAME]", user.getLastname());
+        String emailBody = paymentTemplate
+                .replace("[LINE_1]", line1)
+                .replace("[LINE_2]", line2)
+                .replace("[LINE_3]", line3)
+                .replace("[RECEIPT_MONTHS]", paidMonthsString);
+        emailService.sendMessage(user.getEmail(),
+                subject,
+                emailBody,
+                attachments);
     }
 
 }

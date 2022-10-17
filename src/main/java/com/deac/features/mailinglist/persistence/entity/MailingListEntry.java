@@ -1,5 +1,6 @@
 package com.deac.features.mailinglist.persistence.entity;
 
+import com.deac.user.service.Language;
 import lombok.*;
 
 import javax.persistence.*;
@@ -22,6 +23,10 @@ public class MailingListEntry {
 
     @Column(nullable = false)
     private String tokenValue;
+
+    private String type;
+
+    private Language language = Language.HU;
 
     public MailingListEntry(String email) {
         this.email = email;

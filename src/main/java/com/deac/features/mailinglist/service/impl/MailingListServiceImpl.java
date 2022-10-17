@@ -9,6 +9,7 @@ import com.deac.features.news.dto.NewsInfoDto;
 import com.deac.features.news.service.NewsService;
 import com.deac.mail.EmailService;
 import com.deac.user.persistence.entity.User;
+import com.deac.user.service.Language;
 import com.deac.user.service.UserService;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileCopyUtils;
 
+import javax.annotation.PostConstruct;
 import javax.mail.MessagingException;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -78,7 +80,7 @@ public class MailingListServiceImpl implements MailingListService {
     @Override
     public String clientSubscribeToMailingList() {
         User currentUser = userService.getCurrentUser();
-        return subscribeToMailingList(currentUser.getEmail());
+        return subscribeToMailingList(currentUser.getEmail(), currentUser.getLanguage());
     }
 
     @Override
@@ -90,7 +92,7 @@ public class MailingListServiceImpl implements MailingListService {
     }
 
     @Override
-    public String subscribeToMailingList(String email) {
+    public String subscribeToMailingList(String email, Language language) {
         if (mailingListRepository.existsByEmail(email)) {
             throw new MyException("You are already subscribed", HttpStatus.BAD_REQUEST);
         }
@@ -98,6 +100,7 @@ public class MailingListServiceImpl implements MailingListService {
             throw new MyException("Admins cannot subscribe to our mailing list", HttpStatus.BAD_REQUEST);
         }
         MailingListEntry mailingListEntry = new MailingListEntry(email);
+        mailingListEntry.setLanguage(language);
         String token = RandomStringUtils.randomAlphanumeric(64, 96);
         mailingListEntry.setTokenValue(token);
         mailingListRepository.save(mailingListEntry);
@@ -115,6 +118,7 @@ public class MailingListServiceImpl implements MailingListService {
     }
 
     @Scheduled(cron = "0 0 0 * * 0")
+    @PostConstruct
     public void sendOutWeeklyMails() {
         List<NewsInfoDto> latestNews = newsService.getLatestNews(5);
         StringBuilder articleLines = new StringBuilder();
@@ -128,16 +132,46 @@ public class MailingListServiceImpl implements MailingListService {
                 articleLines.append(mailingListDividerTemplate);
             }
         }
-        String emailBody = mailingListTemplate.replace("[ARTICLE_ROWS]", articleLines.toString());
         mailingListRepository.findAll().forEach(mailingListEntry -> {
             try {
-                emailService.sendMessage(mailingListEntry.getEmail(),
-                        "Your weekly newsletter",
-                        emailBody.replace("[UNSUBSCRIBE_EMAIL]", mailingListEntry.getEmail()).replace("[UNSUBSCRIBE_TOKEN]", mailingListEntry.getTokenValue()),
-                        List.of());
+                sendMembershipEmail(mailingListEntry, articleLines.toString());
             } catch (MessagingException ignored) {
             }
         });
+    }
+
+    private void sendMembershipEmail(MailingListEntry mailingListEntry, String articleLines) throws MessagingException {
+        String subject = "";
+        String line1 = "";
+        String line2 = "";
+        String line3 = "";
+        switch (mailingListEntry.getLanguage()) {
+            case HU:
+                subject = "A heti hírlevele";
+                line1 = "A legfrissebb hírek erről a hétről:";
+                line2 = "Amennyiben le szeretne iratkozni hírlevelünkről, itt teheti meg:";
+                line3 = "Leiratkozás";
+                break;
+            case EN:
+                subject = "Your weekly newsletter";
+                line1 = "The latest news this week:";
+                line2 = "If you wish to unsubscribe from our newsletter, click here:";
+                line3 = "Unsubscribe";
+                break;
+            default:
+                throw new MyException("Unsupported language", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        String emailBody = mailingListTemplate
+                .replace("[LINE_1]", line1)
+                .replace("[ARTICLE_ROWS]", articleLines)
+                .replace("[LINE_2]", line2)
+                .replace("[UNSUBSCRIBE_EMAIL]", mailingListEntry.getEmail())
+                .replace("[UNSUBSCRIBE_TOKEN]", mailingListEntry.getTokenValue())
+                .replace("[LINE_3]", line3);
+        emailService.sendMessage(mailingListEntry.getEmail(),
+                subject,
+                emailBody,
+                List.of());
     }
 
 }

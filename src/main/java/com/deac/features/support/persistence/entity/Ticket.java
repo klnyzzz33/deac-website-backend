@@ -1,6 +1,7 @@
 package com.deac.features.support.persistence.entity;
 
 import com.deac.user.persistence.entity.User;
+import com.deac.user.service.Language;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -34,6 +35,8 @@ public class Ticket {
     private User issuer;
 
     private String issuerEmail;
+
+    private Language issuerLanguage = Language.HU;
 
     @DateTimeFormat(pattern = "yyyy.MM.dd")
     @Column(nullable = false)

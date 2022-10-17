@@ -48,4 +48,7 @@ public interface UserService {
 
     ResponseCookie setCookie(String name, String value, long age, boolean httpOnly, String path);
 
+    String setLanguage(Language language);
+
+    Language getCurrentUserLanguage();
 }

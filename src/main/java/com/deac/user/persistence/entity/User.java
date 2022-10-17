@@ -2,6 +2,7 @@ package com.deac.user.persistence.entity;
 
 import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.support.persistence.entity.Ticket;
+import com.deac.user.service.Language;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -58,6 +59,9 @@ public class User {
     @OneToMany(mappedBy = "issuer", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @ToString.Exclude
     private List<Ticket> tickets = List.of();
+
+    @Column(nullable = false)
+    private Language language = Language.HU;
 
     public User(String username, String email, String password, String surname, String lastname, List<Role> roles) {
         this.username = username;

@@ -323,17 +323,60 @@ public class MembershipServiceImpl implements MembershipService {
                     }
                     unpaidMonthsString.append("</ul>");
                     try {
-                        String emailBody = membershipReminderTemplate.replace("[SURNAME]", membershipEntry.getUser().getSurname())
-                                .replace("[LASTNAME]", membershipEntry.getUser().getLastname())
-                                .replace("[MONTH_COUNT]", String.valueOf(unpaidMonths.size()))
-                                .replace("[UNPAID_MONTHS]", unpaidMonthsString);
-                        emailService.sendMessage(membershipEntry.getUser().getEmail(),
-                                "Monthly reminder to pay your membership fee",
-                                emailBody,
-                                List.of());
+                        sendMembershipEmail(membershipEntry.getUser(), unpaidMonths.size(), unpaidMonthsString.toString());
                     } catch (MessagingException ignored) {
                     }
                 });
+    }
+
+    private void sendMembershipEmail(User user, Integer monthCount, String unpaidMonthsString) throws MessagingException {
+        String subject = "";
+        String line1 = "";
+        String line2 = "";
+        String line3 = "";
+        String line4 = "";
+        String line5 = "";
+        String line6 = "";
+        String line7 = "";
+        switch (user.getLanguage()) {
+            case HU:
+                subject = "Havi emlékeztető a tagdíj befizetésére";
+                line1 = "Tisztelt [SURNAME] [LASTNAME],";
+                line2 = "ez a havi automatizált email-je, amiben emlékeztetni szereténk a tagdíja befizetésére.";
+                line3 = "Önnek jelenleg [MONTH_COUNT] fizetetlen hónapja van:";
+                line4 = "Szeretnénk emlékeztetni, hogy amennyiben több mint 3 hónapon keresztül nem fizeti be a tagdíjat, ki lesz tiltva weboldalunkról.";
+                line5 = "Amennyiben ki lett tiltva, de szeretni újra csatlakozni közösségünkbe, vegye fel a kapcsolatot support csapatunkkal.";
+                line6 = "Üdvözlettel,";
+                line7 = "DEAC Kyokushin Karate Support Csapat";
+                break;
+            case EN:
+                subject = "Monthly reminder to pay your membership fee";
+                line1 = "Dear [SURNAME] [LASTNAME],";
+                line2 = "this is your monthly automated email to remind you to pay your membership fee.";
+                line3 = "You currently have [MONTH_COUNT] unpaid month(s):";
+                line4 = "Remember that if you do not pay the given fees for more than 3 months, you will be banned from the site.";
+                line5 = "In case you get banned, but you would like to rejoin the site, contact our support.";
+                line6 = "Regards,";
+                line7 = "DEAC Kyokushin Karate Support Staff";
+                break;
+            default:
+                throw new MyException("Unsupported language", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        line1 = line1.replace("[SURNAME]", user.getSurname()).replace("[LASTNAME]", user.getLastname());
+        line3 = line3.replace("[MONTH_COUNT]", String.valueOf(monthCount));
+        String emailBody = membershipReminderTemplate
+                .replace("[LINE_1]", line1)
+                .replace("[LINE_2]", line2)
+                .replace("[LINE_3]", line3)
+                .replace("[UNPAID_MONTHS]", unpaidMonthsString)
+                .replace("[LINE_4]", line4)
+                .replace("[LINE_5]", line5)
+                .replace("[LINE_6]", line6)
+                .replace("[LINE_7]", line7);
+        emailService.sendMessage(user.getEmail(),
+                subject,
+                emailBody,
+                List.of());
     }
 
 }

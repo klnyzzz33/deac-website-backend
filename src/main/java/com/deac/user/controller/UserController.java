@@ -6,6 +6,7 @@ import com.deac.user.dto.RegisterDto;
 import com.deac.user.dto.ResetDto;
 import com.deac.response.ResponseMessage;
 import com.deac.user.persistence.entity.User;
+import com.deac.user.service.Language;
 import com.deac.user.service.UserService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -131,6 +132,21 @@ public class UserController {
     @PostMapping("/api/user/forgot_username")
     public ResponseMessage sendUsernameReminderEmail(@RequestBody String email) {
         return new ResponseMessage(userService.sendUsernameReminderEmail(email));
+    }
+
+    @PostMapping("/api/user/language/set")
+    public ResponseMessage setLanguage(@RequestBody String language) {
+        try {
+            Language converted = Language.valueOf(language.toUpperCase());
+            return new ResponseMessage(userService.setLanguage(converted));
+        } catch (IllegalArgumentException e) {
+            throw new MyException("Unsupported language", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @GetMapping("/api/user/language")
+    public ResponseMessage getLanguage() {
+        return new ResponseMessage(userService.getCurrentUserLanguage().name());
     }
 
 }

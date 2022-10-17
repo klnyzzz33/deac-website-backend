@@ -361,15 +361,7 @@ public class SupportServiceImpl implements SupportService {
             savedFiles = uploadAttachments(files, null, ticket.getTitle(), ticketComment.getTitle());
             ticket.setClosed(true);
             try {
-                Document.OutputSettings outputSettings = new Document.OutputSettings();
-                outputSettings.prettyPrint(false);
-                String emailBody = supportTemplate.replace("[ORIGINAL_CONTENT]", Jsoup.clean(ticket.getContent(), "", Safelist.none(), outputSettings))
-                        .replace("[SUPPORT_STAFF_NAME]", currentUser.getUsername())
-                        .replace("[COMMENT_CONTENT]", Jsoup.clean(ticketComment.getContent(), "", Safelist.none(), outputSettings));
-                emailService.sendMessage(ticket.getIssuerEmail(),
-                        "#" + ticket.getTitle(),
-                        emailBody,
-                        savedFiles);
+                sendSupportEmail(currentUser, ticket, ticketComment, savedFiles);
             } catch (MessagingException ignored) {
             }
         } else {
@@ -380,6 +372,55 @@ public class SupportServiceImpl implements SupportService {
         ticket.setUpdateDate(new Date());
         supportRepository.save(ticket);
         return "Successfully posted comment";
+    }
+
+    private void sendSupportEmail(User currentUser, Ticket ticket, TicketComment ticketComment, List<Attachment> attachments) throws MessagingException {
+        String line1 = "";
+        String line2 = "";
+        String line3 = "";
+        String line4 = "";
+        String line5 = "";
+        String line6 = "";
+        String line7 = "";
+        switch (ticket.getIssuerLanguage()) {
+            case HU:
+                line1 = "Tisztelt Hölgyem/Uram,";
+                line2 = "a support csapatunk átvizsgálta és megválaszolta a problémáját.";
+                line3 = "<span style=\"font-weight: bold;\">Ön</span> eredetileg írta:";
+                line4 = "<span style=\"font-weight: bold;\">[SUPPORT_STAFF_NAME]</span> válaszolt:";
+                line5 = "Ha bármilyen további kérdése merülne fel, válaszoljon erre az email-re.";
+                line6 = "Üdvözlettel,";
+                line7 = "DEAC Kyokushin Karate Support Csapat";
+                break;
+            case EN:
+                line1 = "Dear Sir/Madam,";
+                line2 = "our support has reviewed and answered your issue.";
+                line3 = "<span style=\"font-weight: bold;\">You</span> originally asked:";
+                line4 = "<span style=\"font-weight: bold;\">[SUPPORT_STAFF_NAME]</span> replied:";
+                line5 = "If you have any more questions/problems, reply to this email.";
+                line6 = "Regards,";
+                line7 = "DEAC Kyokushin Karate Support Staff";
+                break;
+            default:
+                throw new MyException("Unsupported language", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        line4 = line4.replace("[SUPPORT_STAFF_NAME]", currentUser.getUsername());
+        Document.OutputSettings outputSettings = new Document.OutputSettings();
+        outputSettings.prettyPrint(false);
+        String emailBody = supportTemplate
+                .replace("[LINE_1]", line1)
+                .replace("[LINE_2]", line2)
+                .replace("[LINE_3]", line3)
+                .replace("[ORIGINAL_CONTENT]", Jsoup.clean(ticket.getContent(), "", Safelist.none(), outputSettings))
+                .replace("[LINE_4]", line4)
+                .replace("[COMMENT_CONTENT]", Jsoup.clean(ticketComment.getContent(), "", Safelist.none(), outputSettings))
+                .replace("[LINE_5]", line5)
+                .replace("[LINE_6]", line6)
+                .replace("[LINE_7]", line7);
+        emailService.sendMessage(ticket.getIssuerEmail(),
+                "#" + ticket.getTitle(),
+                emailBody,
+                attachments);
     }
 
     @Override
@@ -453,6 +494,7 @@ public class SupportServiceImpl implements SupportService {
                 null,
                 ticketCreateDto.getIssuerEmail()
         );
+        ticket.setIssuerLanguage(ticketCreateDto.getIssuerLanguage());
         supportRepository.save(ticket);
         return "Successfully created anonymous ticket";
     }
