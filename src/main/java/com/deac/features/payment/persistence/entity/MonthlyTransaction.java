@@ -25,6 +25,8 @@ public class MonthlyTransaction {
 
     private String monthlyTransactionReceiptPath;
 
+    private Long amount;
+
     public MonthlyTransaction(YearMonth monthlyTransactionReceiptMonth, String monthlyTransactionReceiptPath) {
         this.monthlyTransactionReceiptMonth = monthlyTransactionReceiptMonth;
         this.monthlyTransactionReceiptPath = monthlyTransactionReceiptPath;

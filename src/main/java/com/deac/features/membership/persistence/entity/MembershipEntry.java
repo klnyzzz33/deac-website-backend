@@ -24,7 +24,8 @@ public class MembershipEntry {
     @Column(nullable = false)
     private Integer id;
 
-    @OneToOne(mappedBy = "membershipEntry")
+    @OneToOne(mappedBy = "membershipEntry", fetch = FetchType.LAZY)
+    @ToString.Exclude
     private User user;
 
     @DateTimeFormat(pattern = "yyyy.MM.dd")
@@ -34,7 +35,7 @@ public class MembershipEntry {
     @Column(nullable = false)
     private boolean hasPaidMembershipFee = false;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @MapKeyColumn(length = 128)
     @ToString.Exclude
     private Map<String, MonthlyTransaction> monthlyTransactions = Map.of(YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy.MM")), new MonthlyTransaction(YearMonth.now(), null));

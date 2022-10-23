@@ -1,7 +1,7 @@
 package com.deac.features.payment.service.general;
 
-import com.deac.features.membership.persistence.entity.MembershipEntry;
 import com.deac.features.payment.dto.CheckoutInfoDto;
+import com.deac.features.payment.dto.CheckoutItemDto;
 import com.deac.features.payment.dto.ManualPaymentSaveDto;
 import com.deac.mail.Attachment;
 import com.deac.user.persistence.entity.User;
@@ -18,7 +18,7 @@ public interface PaymentService {
 
     CheckoutInfoDto listCheckoutInfo();
 
-    MembershipEntry checkIfMembershipAlreadyPaid();
+    void validateOrder(User user, List<CheckoutItemDto> items);
 
     @SuppressWarnings("DuplicatedCode")
     Attachment generatePaymentReceipt(String paymentId, String paymentMethodId, Long totalAmount, Map<String, String> items, User currentUser);

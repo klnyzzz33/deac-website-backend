@@ -1,5 +1,6 @@
 package com.deac.features.news.persistence.entity;
 
+import com.deac.user.persistence.entity.User;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -25,12 +26,13 @@ public class ModifyEntry {
     @Column(nullable = false)
     private Date modifyDate;
 
-    @Column(nullable = false)
-    private Integer modifyAuthorId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private User modifyAuthor;
 
-    public ModifyEntry(Date modifyDate, Integer modifyAuthorId) {
+    public ModifyEntry(Date modifyDate, User modifyAuthor) {
         this.modifyDate = modifyDate;
-        this.modifyAuthorId = modifyAuthorId;
+        this.modifyAuthor = modifyAuthor;
     }
 
 }

@@ -22,6 +22,7 @@ import com.stripe.model.Customer;
 import com.stripe.param.CustomerCreateParams;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.validator.routines.EmailValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
@@ -42,6 +43,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.FileCopyUtils;
 
 import javax.mail.MessagingException;
@@ -79,6 +81,8 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     private String resetPasswordTemplate;
 
     private String forgotUsernameTemplate;
+
+    private final EmailValidator emailValidator = EmailValidator.getInstance();
 
     @Autowired
     public UserServiceImpl(AuthenticationManager authenticationManager,
@@ -145,6 +149,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
+    @Transactional
     public Map<String, String> signIn(String username, String password, String token) {
         try {
             Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
@@ -158,7 +163,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             String refreshToken = refreshTokenProvider.createToken(token, username, "refresh-token", roles, loginIdentifier, absoluteValidity);
             return Map.of("accessToken", accessToken, "refreshToken", refreshToken, "authorities", objectMapper.writeValueAsString(roles));
         } catch (AuthenticationServiceException e) {
-            throw e;
+            throw new MyException("Unknown error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
         } catch (AuthenticationException e) {
             throw new MyException("Invalid credentials", HttpStatus.UNAUTHORIZED);
         } catch (JsonProcessingException e) {
@@ -169,17 +174,11 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     @Override
     public String signUp(User user) {
         try {
-            if (userRepository.existsByUsername(user.getUsername()) || userRepository.existsByEmail(user.getEmail())) {
-                throw new MyException("Username or email already exists", HttpStatus.CONFLICT);
-            }
-            if ("Anonymous".equals(user.getUsername())) {
-                throw new MyException("Username not allowed", HttpStatus.BAD_REQUEST);
-            }
+            validateUser(user);
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             user.setRoles(List.of(Role.CLIENT));
             user.setEnabled(true);
             user.setMembershipEntry(new MembershipEntry());
-            user.setLanguage(user.getLanguage());
             createCustomer(user);
             userRepository.save(user);
             String verifyToken = RandomStringUtils.randomAlphanumeric(64, 96);
@@ -191,6 +190,27 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         } catch (MessagingException e) {
             userRepository.delete(user);
             throw new MyException("Could not send registration confirmation email", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private void validateUser(User user) {
+        if (userRepository.existsByUsername(user.getUsername()) || userRepository.existsByEmail(user.getEmail())) {
+            throw new MyException("Username or email already exists", HttpStatus.CONFLICT);
+        }
+        if ("Anonymous".equals(user.getUsername())) {
+            throw new MyException("Username not allowed", HttpStatus.BAD_REQUEST);
+        }
+        if (user.getUsername().length() < 4) {
+            throw new MyException("Username must be at least 4 characters long", HttpStatus.BAD_REQUEST);
+        }
+        if (user.getPassword().length() < 8) {
+            throw new MyException("Password must be at least 8 characters long", HttpStatus.BAD_REQUEST);
+        }
+        if (user.getSurname().isEmpty() || user.getLastname().isEmpty()) {
+            throw new MyException("Name cannot be empty", HttpStatus.BAD_REQUEST);
+        }
+        if (!emailValidator.isValid(user.getEmail())) {
+            throw new MyException("Invalid email", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -248,7 +268,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     public Map<String, String> refresh(String refreshToken) {
         try {
             String username = getCurrentUsername();
-            Collection<? extends GrantedAuthority> roles = getCurrentAuthorities();
+            Collection<? extends GrantedAuthority> roles = getCurrentUserAuthorities();
             Date absoluteValidity = refreshTokenProvider.getAbsoluteExpirationTimeFromToken(refreshToken);
             long loginIdentifier = refreshTokenProvider.getLoginIdentifierFromToken(refreshToken);
             String newAccessToken = accessTokenProvider.createToken(username, "access-token", roles);
@@ -277,7 +297,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
-    public Collection<? extends GrantedAuthority> getCurrentAuthorities() {
+    public Collection<? extends GrantedAuthority> getCurrentUserAuthorities() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getAuthorities();
     }
@@ -285,15 +305,6 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     @Override
     public Integer getCurrentUserId() {
         return userRepository.findByUsername(getCurrentUsername()).orElseThrow(() -> new MyException("User does not exist", HttpStatus.BAD_REQUEST)).getId();
-    }
-
-    @Override
-    public String getUser(Integer userId) {
-        Optional<User> user = userRepository.findById(userId);
-        if (user.isEmpty()) {
-            throw new MyException("User does not exist", HttpStatus.BAD_REQUEST);
-        }
-        return user.get().getUsername();
     }
 
     @Override
@@ -334,6 +345,11 @@ public class UserServiceImpl implements UserService, UserDetailsService {
         if (!isEnabled) {
             refreshTokenProvider.invalidateUserTokens(username);
         }
+    }
+
+    @Override
+    public void banUsers(List<User> users) {
+        userRepository.banUsers(users.stream().map(User::getId).collect(Collectors.toList()));
     }
 
     @Override

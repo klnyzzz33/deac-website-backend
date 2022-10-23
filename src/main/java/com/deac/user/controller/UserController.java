@@ -18,7 +18,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.web.bind.annotation.*;
 
-import javax.mail.MessagingException;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -81,7 +80,7 @@ public class UserController {
     @GetMapping("/api/user/current_user_authorities")
     public ResponseMessage getCurrentUserAuthorities() {
         try {
-            return new ResponseMessage(objectMapper.writeValueAsString(userService.getCurrentAuthorities()));
+            return new ResponseMessage(objectMapper.writeValueAsString(userService.getCurrentUserAuthorities()));
         } catch (JsonProcessingException e) {
             throw new MyException("Could not get authorities", HttpStatus.INTERNAL_SERVER_ERROR);
         }

@@ -29,7 +29,7 @@ public class TicketComment {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @ToString.Exclude
     private User issuer;
 

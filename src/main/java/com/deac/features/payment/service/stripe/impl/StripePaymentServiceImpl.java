@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -43,6 +44,7 @@ public class StripePaymentServiceImpl implements StripePaymentService {
     }
 
     @Override
+    @Transactional
     public List<PaymentMethodDto> listPaymentMethods() {
         String customerId = userService.getCurrentUser().getMembershipEntry().getCustomerId();
         Customer customer;
@@ -86,9 +88,12 @@ public class StripePaymentServiceImpl implements StripePaymentService {
     }
 
     @Override
+    @Transactional
     public PaymentStatusDto makePayment(PaymentConfirmDto paymentConfirmDto) {
         try {
-            MembershipEntry currentUserMembershipEntry = paymentService.checkIfMembershipAlreadyPaid();
+            User currentUser = userService.getCurrentUser();
+            paymentService.validateOrder(currentUser, paymentConfirmDto.getItems());
+            MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
             long totalAmount = 0;
             Map<String, String> metaData = new HashMap<>();
             for (CheckoutItemDto item : paymentConfirmDto.getItems()) {
@@ -128,9 +133,12 @@ public class StripePaymentServiceImpl implements StripePaymentService {
     }
 
     @Override
+    @Transactional
     public PaymentStatusDto makePaymentWithSavedPaymentMethod(PaymentConfirmDto paymentConfirmDto) {
         try {
-            MembershipEntry currentUserMembershipEntry = paymentService.checkIfMembershipAlreadyPaid();
+            User currentUser = userService.getCurrentUser();
+            paymentService.validateOrder(currentUser, paymentConfirmDto.getItems());
+            MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
             long totalAmount = 0;
             Map<String, String> metaData = new HashMap<>();
             for (CheckoutItemDto item : paymentConfirmDto.getItems()) {
@@ -229,6 +237,7 @@ public class StripePaymentServiceImpl implements StripePaymentService {
     }
 
     @Override
+    @Transactional
     @SuppressWarnings(value = "DuplicatedCode")
     public String savePayment(String paymentIntentId) {
         try {
@@ -246,7 +255,10 @@ public class StripePaymentServiceImpl implements StripePaymentService {
             Attachment savedFileInfo = paymentService.generatePaymentReceipt(paymentIntent.getId(), paymentIntent.getPaymentMethod(), paymentIntent.getAmount(), items, currentUser);
             for (Map.Entry<String, String> itemEntry : items.entrySet()) {
                 String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
-                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(savedFileInfo.getName());
+                String productPrice = itemEntry.getValue();
+                MonthlyTransaction monthlyTransaction = monthlyTransactions.get(yearMonth);
+                monthlyTransaction.setMonthlyTransactionReceiptPath(savedFileInfo.getName());
+                monthlyTransaction.setAmount(Long.valueOf(productPrice));
             }
             currentUser.setMembershipEntry(currentUserMembershipEntry);
             currentUserMembershipEntry.setHasPaidMembershipFee(true);

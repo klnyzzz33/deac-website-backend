@@ -11,6 +11,7 @@ import org.hibernate.Hibernate;
 
 import javax.persistence.*;
 import javax.validation.constraints.Size;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -42,7 +43,7 @@ public class User {
     @Column(nullable = false)
     private String lastname;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     private List<Role> roles;
 
     @Column(nullable = false)
@@ -51,14 +52,14 @@ public class User {
     @Column(nullable = false)
     private boolean isEnabled;
 
-    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "membershipentry_id")
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, optional = false, fetch = FetchType.LAZY)
+    @MapsId
     @ToString.Exclude
     private MembershipEntry membershipEntry;
 
     @OneToMany(mappedBy = "issuer", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @ToString.Exclude
-    private List<Ticket> tickets = List.of();
+    private List<Ticket> tickets = new ArrayList<>();
 
     @Column(nullable = false)
     private Language language = Language.HU;

@@ -13,6 +13,7 @@ import com.deac.mail.EmailService;
 import com.deac.user.persistence.entity.Role;
 import com.deac.user.persistence.entity.User;
 import com.deac.user.service.UserService;
+import org.apache.commons.collections4.ListUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -97,6 +98,7 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
+    @Transactional
     public List<MembershipEntryInfoDto> listMembershipEntries(int pageNumber, int pageSize, Boolean filterHasPaid) {
         Pageable pageable = PageRequest.of(pageNumber - 1, pageSize, Sort.by("user.username"));
         List<MembershipEntry> membershipEntries;
@@ -105,10 +107,11 @@ public class MembershipServiceImpl implements MembershipService {
         } else {
             membershipEntries = membershipRepository.findByHasPaidMembershipFee(filterHasPaid, pageable);
         }
+        membershipEntries = membershipRepository.findDistinctByIdIn(membershipEntries.stream().map(MembershipEntry::getId).collect(Collectors.toList()));
         return membershipEntryListToMembershipEntryInfoDtoList(membershipEntries);
     }
 
-    private List<MembershipEntryInfoDto> membershipEntryListToMembershipEntryInfoDtoList(List<MembershipEntry> membershipEntries) {
+    public List<MembershipEntryInfoDto> membershipEntryListToMembershipEntryInfoDtoList(List<MembershipEntry> membershipEntries) {
         return membershipEntries
                 .stream()
                 .filter(membershipEntry -> !membershipEntry.getUser().getRoles().contains(Role.ADMIN))
@@ -131,9 +134,9 @@ public class MembershipServiceImpl implements MembershipService {
 
     @Override
     public MembershipEntryInfoDto searchUser(String searchTerm) {
-        Optional<MembershipEntry> membershipEntryOptional = membershipRepository.findByUsername(searchTerm);
+        Optional<MembershipEntry> membershipEntryOptional = membershipRepository.findByUsernameFetch(searchTerm);
         if (membershipEntryOptional.isEmpty()) {
-            membershipEntryOptional = membershipRepository.findByEmail(searchTerm);
+            membershipEntryOptional = membershipRepository.findByEmailFetch(searchTerm);
             if (membershipEntryOptional.isEmpty()) {
                 return null;
             }
@@ -166,13 +169,14 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
+    @Transactional
     public UserProfileDto getUserProfileData(String username) {
         User user = userService.getUserByUsername(username);
         MembershipEntry membershipEntry = user.getMembershipEntry();
         return new UserProfileDto(
                 user.getSurname() + " " + user.getLastname(),
                 user.getUsername(),
-                membershipEntry.getUser().getEmail(),
+                user.getEmail(),
                 membershipEntry.getMemberSince(),
                 user.isEnabled(),
                 user.isVerified(),
@@ -182,6 +186,7 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
+    @Transactional
     public List<MonthlyTransactionDto> listUserTransactions(String username) {
         User user = userService.getUserByUsername(username);
         return monthlyTransactionListToMonthlyTransactionDtoList(user.getMembershipEntry().getMonthlyTransactions().values());
@@ -200,13 +205,14 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
+    @Transactional
     public ProfileDto getCurrentUserProfileData() {
         User user = userService.getCurrentUser();
         MembershipEntry membershipEntry = user.getMembershipEntry();
         return new ProfileDto(
                 user.getSurname() + " " + user.getLastname(),
                 user.getUsername(),
-                membershipEntry.getUser().getEmail(),
+                user.getEmail(),
                 membershipEntry.getMemberSince(),
                 membershipEntry.isHasPaidMembershipFee(),
                 membershipEntry.isApproved()
@@ -214,6 +220,7 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
+    @Transactional
     public List<MonthlyTransactionDto> listCurrentUserTransactions() {
         User currentUser = userService.getCurrentUser();
         return monthlyTransactionListToMonthlyTransactionDtoList(currentUser.getMembershipEntry().getMonthlyTransactions().values());
@@ -244,45 +251,40 @@ public class MembershipServiceImpl implements MembershipService {
         }
     }
 
-    @PostConstruct
-    public void validateMonthlyTransactionsOnStartup() {
-        doValidate(true);
-    }
-
     @Scheduled(cron = "0 0 0 1 * *")
+    @PostConstruct
     public void validateMonthlyTransactions() {
-        doValidate(false);
+        doValidateMemberships();
     }
 
-    @Scheduled(cron = "0 0 0 20 * *")
+    @Scheduled(cron = "0 0 12 20 * *")
     public void monthlyTransactionReminder() {
         checkCurrentMonthTransactions();
     }
 
     @Transactional
-    public void doValidate(boolean onStartup) {
-        List<MembershipEntry> membershipEntries = membershipRepository.findAll()
-                .stream()
-                .filter(membershipEntry -> !membershipEntry.getUser().getRoles().contains(Role.ADMIN))
-                .peek(membershipEntry -> {
-                    if (!onStartup) {
-                        membershipEntry.setHasPaidMembershipFee(false);
-                        membershipEntry.setApproved(false);
-                    }
-                    if (membershipEntry.getUser().isEnabled()) {
+    public void doValidateMemberships() {
+        Thread databaseThread = new Thread(() -> {
+            List<User> usersToBan = new ArrayList<>();
+            List<MembershipEntry> membershipEntries = membershipRepository.findAllActiveMemberships()
+                    .stream()
+                    .filter(membershipEntry -> !membershipEntry.getUser().getRoles().contains(Role.ADMIN))
+                    .peek(membershipEntry -> {
                         Map<String, MonthlyTransaction> originalMonthlyTransactions = membershipEntry.getMonthlyTransactions();
                         boolean unpaid = originalMonthlyTransactions.entrySet()
                                 .stream()
                                 .filter(entry -> entry.getValue().getMonthlyTransactionReceiptMonth().isBefore(YearMonth.now().minusMonths(2L)))
                                 .anyMatch(entry -> entry.getValue().getMonthlyTransactionReceiptPath() == null);
                         if (unpaid) {
-                            if (!onStartup) {
-                                userService.setEnabled(membershipEntry.getUser().getUsername(), false);
-                            }
+                            membershipEntry.setHasPaidMembershipFee(false);
+                            membershipEntry.setApproved(false);
+                            usersToBan.add(membershipEntry.getUser());
                         } else {
                             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
+                            boolean isNewMonth = false;
                             if (!originalMonthlyTransactions.containsKey(YearMonth.now().format(formatter))) {
                                 originalMonthlyTransactions.put(YearMonth.now().format(formatter), new MonthlyTransaction(YearMonth.now(), null));
+                                isNewMonth = true;
                             }
                             Map<String, MonthlyTransaction> monthlyTransactions = originalMonthlyTransactions.entrySet()
                                     .stream()
@@ -293,19 +295,29 @@ public class MembershipServiceImpl implements MembershipService {
                                     ));
                             originalMonthlyTransactions.clear();
                             originalMonthlyTransactions.putAll(monthlyTransactions);
+                            if (isNewMonth) {
+                                membershipEntry.setHasPaidMembershipFee(false);
+                                membershipEntry.setApproved(false);
+                            }
                         }
-                    }
-                })
-                .collect(Collectors.toList());
-        membershipRepository.saveAll(membershipEntries);
+                    })
+                    .collect(Collectors.toList());
+            if (!usersToBan.isEmpty()) {
+                userService.banUsers(usersToBan);
+            }
+            for (List<MembershipEntry> membershipEntryListChunk : ListUtils.partition(membershipEntries, 1000)) {
+                membershipRepository.updateInBatch(membershipEntryListChunk);
+            }
+        });
+        databaseThread.setName("membership-thread");
+        databaseThread.start();
     }
 
     @Transactional
     public void checkCurrentMonthTransactions() {
-        membershipRepository.findAll()
+        Thread membershipMailThread = new Thread(() -> membershipRepository.findAllUnpaidMemberships()
                 .stream()
                 .filter(membershipEntry -> !membershipEntry.getUser().getRoles().contains(Role.ADMIN))
-                .filter(membershipEntry -> !membershipEntry.isHasPaidMembershipFee())
                 .forEach(membershipEntry -> {
                     Map<String, MonthlyTransaction> monthlyTransactions = membershipEntry.getMonthlyTransactions();
                     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM");
@@ -326,7 +338,9 @@ public class MembershipServiceImpl implements MembershipService {
                         sendMembershipEmail(membershipEntry.getUser(), unpaidMonths.size(), unpaidMonthsString.toString());
                     } catch (MessagingException ignored) {
                     }
-                });
+                }));
+        membershipMailThread.setName("membership-mail-thread");
+        membershipMailThread.start();
     }
 
     private void sendMembershipEmail(User user, Integer monthCount, String unpaidMonthsString) throws MessagingException {
@@ -344,8 +358,8 @@ public class MembershipServiceImpl implements MembershipService {
                 line1 = "Tisztelt [SURNAME] [LASTNAME],";
                 line2 = "ez a havi automatizált email-je, amiben emlékeztetni szereténk a tagdíja befizetésére.";
                 line3 = "Önnek jelenleg [MONTH_COUNT] fizetetlen hónapja van:";
-                line4 = "Szeretnénk emlékeztetni, hogy amennyiben több mint 3 hónapon keresztül nem fizeti be a tagdíjat, ki lesz tiltva weboldalunkról.";
-                line5 = "Amennyiben ki lett tiltva, de szeretni újra csatlakozni közösségünkbe, vegye fel a kapcsolatot support csapatunkkal.";
+                line4 = "Szeretnénk emlékeztetni, hogy amennyiben több mint 3 hónapon keresztül nem fizeti be a tagdíjat, a tagságát felfüggesztjük weboldalunkon.";
+                line5 = "Amennyiben tagsága felfüggesztésre került (ki lett tiltva), de szeretni újra csatlakozni közösségünkbe, vegye fel a kapcsolatot support csapatunkkal.";
                 line6 = "Üdvözlettel,";
                 line7 = "DEAC Kyokushin Karate Support Csapat";
                 break;
@@ -354,8 +368,8 @@ public class MembershipServiceImpl implements MembershipService {
                 line1 = "Dear [SURNAME] [LASTNAME],";
                 line2 = "this is your monthly automated email to remind you to pay your membership fee.";
                 line3 = "You currently have [MONTH_COUNT] unpaid month(s):";
-                line4 = "Remember that if you do not pay the given fees for more than 3 months, you will be banned from the site.";
-                line5 = "In case you get banned, but you would like to rejoin the site, contact our support.";
+                line4 = "Remember that if you do not pay the given fees for more than 3 months, your membership on our website will be suspended.";
+                line5 = "In case you get suspended (banned), but you would like to rejoin our site, contact our support.";
                 line6 = "Regards,";
                 line7 = "DEAC Kyokushin Karate Support Staff";
                 break;

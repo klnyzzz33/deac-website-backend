@@ -6,6 +6,7 @@ import org.springframework.security.core.GrantedAuthority;
 
 import javax.servlet.http.HttpServletResponse;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 public interface UserService {
@@ -20,11 +21,9 @@ public interface UserService {
 
     String getCurrentUsername();
 
-    Collection<? extends GrantedAuthority> getCurrentAuthorities();
+    Collection<? extends GrantedAuthority> getCurrentUserAuthorities();
 
     Integer getCurrentUserId();
-
-    String getUser(Integer userId);
 
     User getUserByUsername(String username);
 
@@ -33,6 +32,8 @@ public interface UserService {
     User getCurrentUser();
 
     void setEnabled(String username, boolean isEnabled);
+
+    void banUsers(List<User> users);
 
     void saveUser(User user);
 

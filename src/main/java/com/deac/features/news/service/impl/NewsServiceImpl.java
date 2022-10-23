@@ -26,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -127,7 +128,7 @@ public class NewsServiceImpl implements NewsService {
         } else {
             indexImageUrl = imageUploadBaseUrl + indexImageUrl;
         }
-        News news = new News(title, description, content, indexImageUrl, userService.getCurrentUserId(), new Date());
+        News news = new News(title, description, content, indexImageUrl, userService.getCurrentUser(), new Date());
         newsRepository.save(news);
         updateSearchIndices(news, "create", null);
         return news.getId();
@@ -158,7 +159,7 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     public String updateNews(ModifyDto modifyDto) {
-        Optional<News> newsOptional = newsRepository.findById(modifyDto.getNewsId());
+        Optional<News> newsOptional = newsRepository.findDistinctById(modifyDto.getNewsId());
         if (newsOptional.isEmpty()) {
             throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
         }
@@ -175,7 +176,7 @@ public class NewsServiceImpl implements NewsService {
             }
             news.setIndexImageUrl(indexImageUrl);
         }
-        ModifyEntry modifyEntry = new ModifyEntry(new Date(), userService.getCurrentUserId());
+        ModifyEntry modifyEntry = new ModifyEntry(new Date(), userService.getCurrentUser());
         news.getModifyEntries().add(modifyEntry);
         newsRepository.save(news);
         updateSearchIndices(news, "update", null);
@@ -212,6 +213,7 @@ public class NewsServiceImpl implements NewsService {
     public List<NewsInfoDto> listNews(int pageNumber, int pageSize) {
         Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
         List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
+        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -219,6 +221,7 @@ public class NewsServiceImpl implements NewsService {
     public List<NewsInfoDto> getLatestNews(int pageSize) {
         Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
         List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
+        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -226,6 +229,7 @@ public class NewsServiceImpl implements NewsService {
     public List<NewsInfoDto> getLatestNewsWithExcluded(int pageSize, int excludedId) {
         Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
         List<News> newsList = newsRepository.findByIdNot(excludedId, sortedByCreateDateDesc);
+        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -237,6 +241,7 @@ public class NewsServiceImpl implements NewsService {
         if (newsList.size() < pageSize) {
             newsList.addAll(getMostPopularNewsByAuthorNotWithExcluded(userId, pageSize - newsList.size(), excludedId));
         }
+        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -250,6 +255,7 @@ public class NewsServiceImpl implements NewsService {
         Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
         Integer userId = userService.getUserByUsername(author).getId();
         List<News> newsList = newsRepository.findByAuthorId(userId, sortedByCreateDateDesc);
+        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -262,6 +268,7 @@ public class NewsServiceImpl implements NewsService {
             sortedByCreateDateDesc = PageRequest.of(0, pageSize - newsList.size(), Sort.by("numberOfViews").descending().and(Sort.by("createDate").descending()));
             newsList.addAll(newsRepository.findByCreateDateBefore(lastMonth, sortedByCreateDateDesc));
         }
+        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -275,9 +282,9 @@ public class NewsServiceImpl implements NewsService {
                             news.getDescription(),
                             null,
                             news.getIndexImageUrl(),
-                            userService.getUser(news.getAuthorId()),
+                            news.getAuthor().getUsername(),
                             news.getCreateDate(),
-                            latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
+                            latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), latestModifyEntry.getModifyAuthor().getUsername()) : null);
                 })
                 .collect(Collectors.toList());
     }
@@ -295,7 +302,7 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     public NewsInfoDto getSingleNews(Integer id) {
-        Optional<News> newsOptional = newsRepository.findById(id);
+        Optional<News> newsOptional = newsRepository.findDistinctById(id);
         if (newsOptional.isEmpty()) {
             throw new MyException("News does not exist", HttpStatus.BAD_REQUEST);
         }
@@ -308,9 +315,9 @@ public class NewsServiceImpl implements NewsService {
                 news.getDescription(),
                 news.getContent(),
                 news.getIndexImageUrl(),
-                userService.getUser(news.getAuthorId()),
+                news.getAuthor().getUsername(),
                 news.getCreateDate(),
-                latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), userService.getUser(latestModifyEntry.getModifyAuthorId())) : null);
+                latestModifyEntry != null ? new ModifyInfoDto(latestModifyEntry.getModifyDate(), latestModifyEntry.getModifyAuthor().getUsername()) : null);
     }
 
     @Override
@@ -327,10 +334,11 @@ public class NewsServiceImpl implements NewsService {
     }
 
     @Override
+    @Transactional
     public NewsSearchListDto searchNews(String searchTerm, int pageNumber, int pageSize) {
         SearchResult searchResult = doSearch(searchTerm, pageNumber - 1, pageSize);
         List<Integer> searchIds = searchResult.getResults();
-        List<News> results = newsRepository.findAllById(searchIds);
+        List<News> results = newsRepository.findDistinctByIdIn(searchIds);
         results.sort(Comparator.comparing(item -> searchIds.indexOf(item.getId())));
         return new NewsSearchListDto(newsListToNewsInfoDtoList(results), searchResult.getNumberOfResults());
     }

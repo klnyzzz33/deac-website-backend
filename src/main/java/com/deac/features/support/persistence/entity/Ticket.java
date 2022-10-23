@@ -30,7 +30,7 @@ public class Ticket {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @ToString.Exclude
     private User issuer;
 
@@ -48,7 +48,7 @@ public class Ticket {
     @ElementCollection(fetch = FetchType.LAZY)
     private List<String> attachmentPaths;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, targetEntity = TicketComment.class)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @ToString.Exclude
     private List<TicketComment> comments;
 

@@ -118,27 +118,31 @@ public class MailingListServiceImpl implements MailingListService {
 
     @Scheduled(cron = "0 0 0 * * 0")
     public void sendOutWeeklyMails() {
-        List<NewsInfoDto> latestNews = newsService.getLatestNews(5);
-        StringBuilder articleLines = new StringBuilder();
-        for (int i = 0; i < latestNews.size(); i++) {
-            NewsInfoDto news = latestNews.get(i);
-            String truncatedTitle = news.getTitle().length() >= 50 ? (news.getTitle().substring(0, 50) + "...") : news.getTitle();
-            String truncatedDescription = news.getDescription().length() >= 50 ? (news.getDescription().substring(0, 50) + "...") : news.getDescription();
-            String articleLine = mailingListArticleLineTemplate.replace("[NEWS_TITLE]", truncatedTitle).replace("[NEWS_DESCRIPTION]", truncatedDescription);
-            articleLines.append(articleLine);
-            if (i != latestNews.size() - 1) {
-                articleLines.append(mailingListDividerTemplate);
+        Thread mailThread = new Thread(() -> {
+            List<NewsInfoDto> latestNews = newsService.getLatestNews(5);
+            StringBuilder articleLines = new StringBuilder();
+            for (int i = 0; i < latestNews.size(); i++) {
+                NewsInfoDto news = latestNews.get(i);
+                String truncatedTitle = news.getTitle().length() >= 50 ? (news.getTitle().substring(0, 50) + "...") : news.getTitle();
+                String truncatedDescription = news.getDescription().length() >= 50 ? (news.getDescription().substring(0, 50) + "...") : news.getDescription();
+                String articleLine = mailingListArticleLineTemplate.replace("[NEWS_TITLE]", truncatedTitle).replace("[NEWS_DESCRIPTION]", truncatedDescription);
+                articleLines.append(articleLine);
+                if (i != latestNews.size() - 1) {
+                    articleLines.append(mailingListDividerTemplate);
+                }
             }
-        }
-        mailingListRepository.findAll().forEach(mailingListEntry -> {
-            try {
-                sendMembershipEmail(mailingListEntry, articleLines.toString());
-            } catch (MessagingException ignored) {
-            }
+            mailingListRepository.findAll().forEach(mailingListEntry -> {
+                try {
+                    sendMembershipEmail(mailingListEntry, articleLines.toString());
+                } catch (MessagingException ignored) {
+                }
+            });
         });
+        mailThread.setName("mail-thread");
+        mailThread.start();
     }
 
-    private void sendMembershipEmail(MailingListEntry mailingListEntry, String articleLines) throws MessagingException {
+    public void sendMembershipEmail(MailingListEntry mailingListEntry, String articleLines) throws MessagingException {
         String subject = "";
         String line1 = "";
         String line2 = "";

@@ -1,5 +1,6 @@
 package com.deac.features.news.persistence.entity;
 
+import com.deac.user.persistence.entity.User;
 import lombok.*;
 import org.springframework.format.annotation.DateTimeFormat;
 
@@ -31,26 +32,27 @@ public class News {
 
     private String indexImageUrl;
 
-    @Column(nullable = false)
-    private Integer authorId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private User author;
 
     @DateTimeFormat(pattern = "yyyy.MM.dd")
     @Column(nullable = false)
     private Date createDate;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @ToString.Exclude
     private List<ModifyEntry> modifyEntries;
 
     @Column(nullable = false)
     private Long numberOfViews = 0L;
 
-    public News(String title, String description, String content, String indexImageUrl, Integer authorId, Date createDate) {
+    public News(String title, String description, String content, String indexImageUrl, User author, Date createDate) {
         this.title = title;
         this.description = description;
         this.content = content;
         this.indexImageUrl = indexImageUrl;
-        this.authorId = authorId;
+        this.author = author;
         this.createDate = createDate;
         this.modifyEntries = new ArrayList<>();
     }

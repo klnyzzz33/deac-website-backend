@@ -26,6 +26,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.FileCopyUtils;
 
 import javax.mail.MessagingException;
@@ -87,6 +88,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional
     @SuppressWarnings(value = "DuplicatedCode")
     public String savePaymentManual(ManualPaymentSaveDto payment) {
         try {
@@ -121,7 +123,10 @@ public class PaymentServiceImpl implements PaymentService {
             Attachment savedFileInfo = generatePaymentReceipt("Weboldalon kívül fizetve", "Weboldalon kívül fizetve", totalAmount, items, user);
             for (Map.Entry<String, String> itemEntry : items.entrySet()) {
                 String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
-                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(savedFileInfo.getName());
+                String productPrice = itemEntry.getValue();
+                MonthlyTransaction monthlyTransaction = monthlyTransactions.get(yearMonth);
+                monthlyTransaction.setMonthlyTransactionReceiptPath(savedFileInfo.getName());
+                monthlyTransaction.setAmount(Long.valueOf(productPrice));
             }
             user.setMembershipEntry(userMembershipEntry);
             List<MonthlyTransaction> unPaidMonths = userMembershipEntry.getMonthlyTransactions().values()
@@ -139,8 +144,11 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional
     public CheckoutInfoDto listCheckoutInfo() {
-        MembershipEntry currentUserMembershipEntry = checkIfMembershipAlreadyPaid();
+        User currentUser = userService.getCurrentUser();
+        validateOrder(currentUser, null);
+        MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
         boolean isHuf = "huf".equals(currency);
         List<CheckoutItemDto> items;
         if (isHuf) {
@@ -162,17 +170,28 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public MembershipEntry checkIfMembershipAlreadyPaid() {
-        User currentUser = userService.getCurrentUser();
-        MembershipEntry currentUserMembershipEntry = currentUser.getMembershipEntry();
-        List<MonthlyTransaction> monthlyTransactions = currentUserMembershipEntry.getMonthlyTransactions().values()
+    public void validateOrder(User user, List<CheckoutItemDto> items) {
+        MembershipEntry currentUserMembershipEntry = user.getMembershipEntry();
+        List<YearMonth> unpaidMonths = currentUserMembershipEntry.getMonthlyTransactions().values()
                 .stream()
                 .filter(monthlyTransaction -> monthlyTransaction.getMonthlyTransactionReceiptPath() == null)
+                .map(MonthlyTransaction::getMonthlyTransactionReceiptMonth)
                 .collect(Collectors.toList());
-        if (monthlyTransactions.isEmpty()) {
+        if (unpaidMonths.isEmpty()) {
             throw new MyException("Monthly membership fee already paid", HttpStatus.BAD_REQUEST);
         }
-        return currentUserMembershipEntry;
+        if (items != null) {
+            boolean invalidItems = items.stream()
+                    .anyMatch(checkoutItemDto -> {
+                        boolean isHuf = "huf".equals(currency);
+                        Long actualAmount = isHuf ? amount / 100 : amount;
+                        return !checkoutItemDto.getAmount().equals(actualAmount)
+                                || !unpaidMonths.contains(checkoutItemDto.getMonthlyTransactionReceiptMonth());
+                    });
+            if (invalidItems) {
+                throw new MyException("Invalid items specified", HttpStatus.BAD_REQUEST);
+            }
+        }
     }
 
     @Override

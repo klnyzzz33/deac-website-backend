@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.net.URI;
@@ -64,6 +65,7 @@ public class PaypalPaymentServiceImpl implements PaypalPaymentService {
     @Override
     public Object createOrder(List<CheckoutItemDto> items) {
         try {
+            paymentService.validateOrder(userService.getCurrentUser(), items);
             String accessToken = generateAccessToken();
             List<Map<String, Object>> itemsList = new ArrayList<>();
             long totalAmount = 0;
@@ -151,6 +153,7 @@ public class PaypalPaymentServiceImpl implements PaypalPaymentService {
     }
 
     @Override
+    @Transactional
     @SuppressWarnings(value = "DuplicatedCode")
     public String savePayment(String orderId) {
         try {
@@ -174,7 +177,10 @@ public class PaypalPaymentServiceImpl implements PaypalPaymentService {
             Attachment savedFileInfo = paymentService.generatePaymentReceipt(order.get("id").toString(), "PayPal", totalAmount, items, currentUser);
             for (Map.Entry<String, String> itemEntry : items.entrySet()) {
                 String yearMonth = YearMonth.parse(itemEntry.getKey()).format(formatter);
-                monthlyTransactions.get(yearMonth).setMonthlyTransactionReceiptPath(savedFileInfo.getName());
+                String productPrice = itemEntry.getValue();
+                MonthlyTransaction monthlyTransaction = monthlyTransactions.get(yearMonth);
+                monthlyTransaction.setMonthlyTransactionReceiptPath(savedFileInfo.getName());
+                monthlyTransaction.setAmount(Long.valueOf(productPrice));
             }
             currentUser.setMembershipEntry(currentUserMembershipEntry);
             currentUserMembershipEntry.setHasPaidMembershipFee(true);
