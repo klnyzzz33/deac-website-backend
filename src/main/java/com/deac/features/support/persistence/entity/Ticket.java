@@ -36,6 +36,7 @@ public class Ticket {
 
     private String issuerEmail;
 
+    @Column(nullable = false)
     private Language issuerLanguage = Language.HU;
 
     @DateTimeFormat(pattern = "yyyy.MM.dd")

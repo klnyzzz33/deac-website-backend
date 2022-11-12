@@ -106,10 +106,15 @@ public class UserController {
         }
     }
 
-    @GetMapping("/api/user/logout")
-    public ResponseMessage logout(HttpServletResponse response) {
+    @GetMapping("/api/user/auth/logout")
+    public ResponseMessage logout(HttpServletRequest request, HttpServletResponse response) {
         try {
-            String responseString = userService.signOut();
+            String refreshToken = request.getCookies() != null ? Arrays.stream(request.getCookies())
+                    .filter(cookie -> cookie.getName().equals("refresh-token"))
+                    .map(Cookie::getValue)
+                    .findFirst()
+                    .orElse("") : "";
+            String responseString = userService.signOut(refreshToken);
             userService.removeCookies(response);
             return new ResponseMessage(responseString);
         } catch (MyException e) {

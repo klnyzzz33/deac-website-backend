@@ -1,6 +1,7 @@
 package com.deac.user.persistence.entity;
 
 import com.deac.features.membership.persistence.entity.MembershipEntry;
+import com.deac.features.news.persistence.entity.News;
 import com.deac.features.support.persistence.entity.Ticket;
 import com.deac.user.service.Language;
 import lombok.Getter;
@@ -52,14 +53,18 @@ public class User {
     @Column(nullable = false)
     private boolean isEnabled;
 
-    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, optional = false, fetch = FetchType.LAZY)
-    @MapsId
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @PrimaryKeyJoinColumn
     @ToString.Exclude
     private MembershipEntry membershipEntry;
 
     @OneToMany(mappedBy = "issuer", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @ToString.Exclude
     private List<Ticket> tickets = new ArrayList<>();
+
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private List<News> news = new ArrayList<>();
 
     @Column(nullable = false)
     private Language language = Language.HU;

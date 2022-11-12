@@ -107,7 +107,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             User admin = new User("kyokushindev", "deackyokushindev@gmail.com", passwordEncoder.encode("=Zz]_e3v'uF-N(O"), "Admin", "", List.of(Role.ADMIN));
             admin.setVerified(true);
             admin.setEnabled(true);
-            admin.setMembershipEntry(new MembershipEntry(true, Map.of(), true));
+            MembershipEntry membershipEntry = new MembershipEntry(true, Map.of(), true);
+            membershipEntry.setUser(admin);
+            admin.setMembershipEntry(membershipEntry);
             this.userRepository.save(admin);
         }
         ResourceLoader resourceLoader = new DefaultResourceLoader();
@@ -178,7 +180,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             user.setRoles(List.of(Role.CLIENT));
             user.setEnabled(true);
-            user.setMembershipEntry(new MembershipEntry());
+            MembershipEntry membershipEntry = new MembershipEntry();
+            membershipEntry.setUser(user);
+            user.setMembershipEntry(membershipEntry);
             createCustomer(user);
             userRepository.save(user);
             String verifyToken = RandomStringUtils.randomAlphanumeric(64, 96);
@@ -280,9 +284,9 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     }
 
     @Override
-    public String signOut() {
+    public String signOut(String refreshToken) {
         try {
-            refreshTokenProvider.invalidateUserTokens(getCurrentUsername());
+            refreshTokenProvider.invalidateUserTokenWithLoginId(getCurrentUsername(), refreshToken);
             SecurityContextHolder.clearContext();
             return "Successfully logged out";
         } catch (Exception e) {

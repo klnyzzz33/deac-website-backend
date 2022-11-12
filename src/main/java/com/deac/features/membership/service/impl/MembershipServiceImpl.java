@@ -107,7 +107,9 @@ public class MembershipServiceImpl implements MembershipService {
         } else {
             membershipEntries = membershipRepository.findByHasPaidMembershipFee(filterHasPaid, pageable);
         }
-        membershipEntries = membershipRepository.findDistinctByIdIn(membershipEntries.stream().map(MembershipEntry::getId).collect(Collectors.toList()));
+        if (!membershipEntries.isEmpty()) {
+            membershipEntries = membershipRepository.findDistinctByIdIn(membershipEntries.stream().map(MembershipEntry::getId).collect(Collectors.toList()));
+        }
         return membershipEntryListToMembershipEntryInfoDtoList(membershipEntries);
     }
 

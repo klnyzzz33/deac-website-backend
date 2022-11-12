@@ -462,7 +462,9 @@ public class SupportServiceImpl implements SupportService {
     public Long getClientNumberOfCommentNotifications() {
         User currentUser = userService.getCurrentUser();
         List<Ticket> currentUserTickets = supportRepository.findByIssuer(currentUser);
-        currentUserTickets = supportRepository.fetchComments(currentUserTickets.stream().map(Ticket::getId).collect(Collectors.toList()));
+        if (!currentUserTickets.isEmpty()) {
+            currentUserTickets = supportRepository.fetchComments(currentUserTickets.stream().map(Ticket::getId).collect(Collectors.toList()));
+        }
         return currentUserTickets.stream()
                 .mapToLong(ticket -> ticket.getComments().stream()
                         .filter(ticketComment -> !ticketComment.getIssuer().getId().equals(currentUser.getId()))

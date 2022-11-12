@@ -27,7 +27,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -78,26 +77,26 @@ public class NewsServiceImpl implements NewsService {
 
     private void setupSearchIndexing(String searchIndexPath) {
         try {
-            index = new MMapDirectory(Path.of(searchIndexPath));
-            StandardAnalyzer analyzer = new StandardAnalyzer();
-            IndexWriterConfig config = new IndexWriterConfig(analyzer);
-            writer = new IndexWriter(index, config);
-            writer.deleteAll();
-            writer.commit();
-            newsRepository.findAll()
-                    .forEach(news -> {
-                        Document document = new Document();
-                        document.add(new TextField("normalizedTitle", StringUtils.join(normalizeSearchTerm(news.getTitle()), " "), Field.Store.YES));
-                        document.add(new TextField("id", news.getId().toString(), Field.Store.YES));
-                        try {
-                            writer.addDocument(document);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    });
-            writer.commit();
-        } catch (IOException e) {
-            e.printStackTrace();
+        index = new MMapDirectory(Path.of(searchIndexPath));
+        StandardAnalyzer analyzer = new StandardAnalyzer();
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        writer = new IndexWriter(index, config);
+        writer.deleteAll();
+        writer.commit();
+        newsRepository.findAll()
+                .forEach(news -> {
+                    Document document = new Document();
+                    document.add(new TextField("normalizedTitle", StringUtils.join(normalizeSearchTerm(news.getTitle()), " "), Field.Store.YES));
+                    document.add(new TextField("id", news.getId().toString(), Field.Store.YES));
+                    try {
+                        writer.addDocument(document);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+        writer.commit();
+    } catch (IOException e) {
+        e.printStackTrace();
         }
     }
 
@@ -145,7 +144,7 @@ public class NewsServiceImpl implements NewsService {
     }
 
     @Override
-    public String deleteSelectedNews(@RequestBody List<Integer> newsIds) {
+    public String deleteSelectedNews(List<Integer> newsIds) {
         if (newsIds.isEmpty()) {
             return "Successfully deleted news";
         }
@@ -213,7 +212,9 @@ public class NewsServiceImpl implements NewsService {
     public List<NewsInfoDto> listNews(int pageNumber, int pageSize) {
         Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
         List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
-        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        if (!newsList.isEmpty()) {
+            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        }
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -221,7 +222,9 @@ public class NewsServiceImpl implements NewsService {
     public List<NewsInfoDto> getLatestNews(int pageSize) {
         Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
         List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
-        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        if (!newsList.isEmpty()) {
+            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        }
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -229,7 +232,9 @@ public class NewsServiceImpl implements NewsService {
     public List<NewsInfoDto> getLatestNewsWithExcluded(int pageSize, int excludedId) {
         Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
         List<News> newsList = newsRepository.findByIdNot(excludedId, sortedByCreateDateDesc);
-        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        if (!newsList.isEmpty()) {
+            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        }
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -241,7 +246,9 @@ public class NewsServiceImpl implements NewsService {
         if (newsList.size() < pageSize) {
             newsList.addAll(getMostPopularNewsByAuthorNotWithExcluded(userId, pageSize - newsList.size(), excludedId));
         }
-        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        if (!newsList.isEmpty()) {
+            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        }
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -255,7 +262,9 @@ public class NewsServiceImpl implements NewsService {
         Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
         Integer userId = userService.getUserByUsername(author).getId();
         List<News> newsList = newsRepository.findByAuthorId(userId, sortedByCreateDateDesc);
-        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        if (!newsList.isEmpty()) {
+            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        }
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -268,7 +277,9 @@ public class NewsServiceImpl implements NewsService {
             sortedByCreateDateDesc = PageRequest.of(0, pageSize - newsList.size(), Sort.by("numberOfViews").descending().and(Sort.by("createDate").descending()));
             newsList.addAll(newsRepository.findByCreateDateBefore(lastMonth, sortedByCreateDateDesc));
         }
-        newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        if (!newsList.isEmpty()) {
+            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+        }
         return newsListToNewsInfoDtoList(newsList);
     }
 
@@ -338,8 +349,11 @@ public class NewsServiceImpl implements NewsService {
     public NewsSearchListDto searchNews(String searchTerm, int pageNumber, int pageSize) {
         SearchResult searchResult = doSearch(searchTerm, pageNumber - 1, pageSize);
         List<Integer> searchIds = searchResult.getResults();
-        List<News> results = newsRepository.findDistinctByIdIn(searchIds);
-        results.sort(Comparator.comparing(item -> searchIds.indexOf(item.getId())));
+        List<News> results = new ArrayList<>();
+        if (!searchIds.isEmpty()) {
+            results = newsRepository.findDistinctByIdIn(searchIds);
+            results.sort(Comparator.comparing(item -> searchIds.indexOf(item.getId())));
+        }
         return new NewsSearchListDto(newsListToNewsInfoDtoList(results), searchResult.getNumberOfResults());
     }
 

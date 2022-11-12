@@ -20,11 +20,12 @@ import java.util.Map;
 public class MembershipEntry {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(nullable = false)
+    @Column(nullable = false, name = "membershipentry_id")
     private Integer id;
 
     @OneToOne(mappedBy = "membershipEntry", fetch = FetchType.LAZY)
+    @JoinColumn(name = "membershipentry_id")
+    @MapsId
     @ToString.Exclude
     private User user;
 
@@ -38,7 +39,8 @@ public class MembershipEntry {
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @MapKeyColumn(length = 128)
     @ToString.Exclude
-    private Map<String, MonthlyTransaction> monthlyTransactions = Map.of(YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy.MM")), new MonthlyTransaction(YearMonth.now(), null));
+    private Map<String, MonthlyTransaction> monthlyTransactions = Map.of(YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy.MM")),
+            new MonthlyTransaction(YearMonth.now(), null));
 
     @Column(nullable = false)
     private boolean approved = false;

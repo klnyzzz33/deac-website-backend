@@ -31,8 +31,7 @@ public class JwtHelper {
 
     @Autowired
     public JwtHelper() {
-        //secretKey = Base64.getEncoder().encodeToString(generateRandomString(32).getBytes());
-        secretKey = "asdasdasd";
+        secretKey = Base64.getEncoder().encodeToString(generateRandomString(32).getBytes());
     }
 
     public String generateRandomString(int length) {

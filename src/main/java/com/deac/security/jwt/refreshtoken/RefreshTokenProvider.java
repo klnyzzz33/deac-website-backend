@@ -72,6 +72,11 @@ public class RefreshTokenProvider {
         return refreshToken.getUsername();
     }
 
+    public void invalidateUserTokenWithLoginId(String username, String token) {
+        long loginId = getLoginIdentifierFromToken(token);
+        refreshTokenRepository.deleteByUserAndLoginId(username, loginId);
+    }
+
     public void invalidateUserTokens(String username) {
         refreshTokenRepository.deleteByUser(username);
     }

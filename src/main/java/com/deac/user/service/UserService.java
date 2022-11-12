@@ -17,7 +17,7 @@ public interface UserService {
 
     Map<String, String> refresh(String refreshToken);
 
-    String signOut();
+    String signOut(String refreshToken);
 
     String getCurrentUsername();
 
