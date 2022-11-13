@@ -213,7 +213,7 @@ public class NewsServiceImpl implements NewsService {
         Pageable sortedByCreateDateDesc = PageRequest.of(pageNumber - 1, pageSize, Sort.by("createDate").descending());
         List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
         if (!newsList.isEmpty()) {
-            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+            newsList = newsRepository.findDistinctByIdInOrderByCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
         }
         return newsListToNewsInfoDtoList(newsList);
     }
@@ -223,7 +223,7 @@ public class NewsServiceImpl implements NewsService {
         Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
         List<News> newsList = newsRepository.findBy(sortedByCreateDateDesc);
         if (!newsList.isEmpty()) {
-            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+            newsList = newsRepository.findDistinctByIdInOrderByCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
         }
         return newsListToNewsInfoDtoList(newsList);
     }
@@ -233,7 +233,7 @@ public class NewsServiceImpl implements NewsService {
         Pageable sortedByCreateDateDesc = PageRequest.of(0, pageSize, Sort.by("createDate").descending());
         List<News> newsList = newsRepository.findByIdNot(excludedId, sortedByCreateDateDesc);
         if (!newsList.isEmpty()) {
-            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+            newsList = newsRepository.findDistinctByIdInOrderByCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
         }
         return newsListToNewsInfoDtoList(newsList);
     }
@@ -247,7 +247,7 @@ public class NewsServiceImpl implements NewsService {
             newsList.addAll(getMostPopularNewsByAuthorNotWithExcluded(userId, pageSize - newsList.size(), excludedId));
         }
         if (!newsList.isEmpty()) {
-            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+            newsList = newsRepository.findDistinctByIdInOrderByCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
         }
         return newsListToNewsInfoDtoList(newsList);
     }
@@ -263,7 +263,7 @@ public class NewsServiceImpl implements NewsService {
         Integer userId = userService.getUserByUsername(author).getId();
         List<News> newsList = newsRepository.findByAuthorId(userId, sortedByCreateDateDesc);
         if (!newsList.isEmpty()) {
-            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+            newsList = newsRepository.findDistinctByIdInOrderByCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
         }
         return newsListToNewsInfoDtoList(newsList);
     }
@@ -278,7 +278,7 @@ public class NewsServiceImpl implements NewsService {
             newsList.addAll(newsRepository.findByCreateDateBefore(lastMonth, sortedByCreateDateDesc));
         }
         if (!newsList.isEmpty()) {
-            newsList = newsRepository.findDistinctByIdIn(newsList.stream().map(News::getId).collect(Collectors.toList()));
+            newsList = newsRepository.findDistinctByIdInOrderByCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
         }
         return newsListToNewsInfoDtoList(newsList);
     }

@@ -36,6 +36,9 @@ public interface NewsRepository extends JpaRepository<News, Integer> {
     @EntityGraph(attributePaths = {"author", "modifyEntries", "modifyEntries.modifyAuthor"})
     List<News> findDistinctByIdIn(List<Integer> ids);
 
+    @EntityGraph(attributePaths = {"author", "modifyEntries", "modifyEntries.modifyAuthor"})
+    List<News> findDistinctByIdInOrderByCreateDateDesc(List<Integer> ids);
+
     long countByAuthorId(Integer authorId);
 
     @Query("SELECT count(n) FROM News n WHERE n.id IN :ids")

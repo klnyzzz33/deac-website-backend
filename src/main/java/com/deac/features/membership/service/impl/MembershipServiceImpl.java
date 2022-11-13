@@ -131,6 +131,7 @@ public class MembershipServiceImpl implements MembershipService {
                             hasReceipts
                     );
                 })
+                .sorted(Comparator.comparing(MembershipEntryInfoDto::getUsername))
                 .collect(Collectors.toList());
     }
 
