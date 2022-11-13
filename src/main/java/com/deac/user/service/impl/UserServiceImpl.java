@@ -139,7 +139,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
     public UserDetails loadUserByUsername(String username) {
         Optional<User> userOptional = userRepository.findByUsername(username);
         if (userOptional.isEmpty()) {
-            throw new UsernameNotFoundException("User does not exist");
+            throw new MyException("User does not exist", HttpStatus.BAD_REQUEST);
         }
         User user = userOptional.get();
         if (!user.isVerified()) {
@@ -165,7 +165,7 @@ public class UserServiceImpl implements UserService, UserDetailsService {
             String refreshToken = refreshTokenProvider.createToken(token, username, "refresh-token", roles, loginIdentifier, absoluteValidity);
             return Map.of("accessToken", accessToken, "refreshToken", refreshToken, "authorities", objectMapper.writeValueAsString(roles));
         } catch (AuthenticationServiceException e) {
-            throw new MyException("Unknown error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw e;
         } catch (AuthenticationException e) {
             throw new MyException("Invalid credentials", HttpStatus.UNAUTHORIZED);
         } catch (JsonProcessingException e) {
