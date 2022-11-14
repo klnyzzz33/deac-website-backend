@@ -247,7 +247,7 @@ public class NewsServiceImpl implements NewsService {
             newsList.addAll(getMostPopularNewsByAuthorNotWithExcluded(userId, pageSize - newsList.size(), excludedId));
         }
         if (!newsList.isEmpty()) {
-            newsList = newsRepository.findDistinctByIdInOrderByCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
+            newsList = newsRepository.findDistinctByIdInOrderByNumberOfViewsDescCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
         }
         return newsListToNewsInfoDtoList(newsList);
     }
@@ -278,7 +278,7 @@ public class NewsServiceImpl implements NewsService {
             newsList.addAll(newsRepository.findByCreateDateBefore(lastMonth, sortedByCreateDateDesc));
         }
         if (!newsList.isEmpty()) {
-            newsList = newsRepository.findDistinctByIdInOrderByCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
+            newsList = newsRepository.findDistinctByIdInOrderByNumberOfViewsDescCreateDateDesc(newsList.stream().map(News::getId).collect(Collectors.toList()));
         }
         return newsListToNewsInfoDtoList(newsList);
     }
