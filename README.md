@@ -15,4 +15,4 @@ community of the department. Also implemented a custom search feature using Apac
 clients get the most recent, top-viewed published articles weekly
 * support system: option to submit tickets, where clients can describe arising problems/questions
 (optionally upload attachments too). Admins manage the tickets: option to submit answers to
-opened tickets, close/reopen tickets.
+opened tickets, close/reopen tickets
